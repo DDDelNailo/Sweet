@@ -16,8 +16,9 @@ class Collision:
         result = []
 
         for other in group:
-            if polygon_b == None: polygon_b = other.mask.def_polygon()
-            collision = cls.colliding(element, other, polygon_a, polygon_b)
+            use_polygon_b = polygon_b
+            if polygon_b == None: use_polygon_b = other.mask.def_polygon()
+            collision = cls.colliding(element, other, polygon_a, use_polygon_b)
             if collision:
                 if apply_func:
                     apply_func(element, other, collision)
