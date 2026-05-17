@@ -787,9 +787,9 @@ class ShaderHandler:
 
         for sprite in cls._render_list:
             same_program = True
+            # if sprite.program == None: sprite.program = "def"
             if not sprite.program == None and not sprite.program == last_program:
                 same_program = False
-                cls.set_shader(sprite.program)
 
             same_batch = sprite.tex_id == last_id and sprite.unit == last_unit and same_program
             if not same_batch and batch:
@@ -812,6 +812,9 @@ class ShaderHandler:
     @classmethod
     def build_instance_buffer(cls, sprites, view_matrix, cam_scale, cam_angle) -> np.array:
         data = []
+
+        if sprites[0].program == None: sprites[0].program = "def"
+        cls.set_shader(sprites[0].program)
 
         for s in sprites:
             x, y = s.pos

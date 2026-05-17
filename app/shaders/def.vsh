@@ -34,7 +34,6 @@ void main()
 
     v_texcoord = a_texcoord * iUVScale + iUVOff;
 
-    v_texcoord.y = v_texcoord.y;
     v_rgb = iRgb;
     v_alpha = iAlpha;
 }

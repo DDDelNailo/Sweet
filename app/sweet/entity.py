@@ -81,10 +81,13 @@ class EntityTools:
                    alpha: float=1,
                    static: bool=False,
                    program: str=None,
-                   unit=GL_TEXTURE0) -> None:
+                   unit=GL_TEXTURE0,
+                   overhead_data=[]) -> None:
 
         color = (color[0] / 255, color[1] / 255, color[2] / 255)
-        sprite = Sprite(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, [*color, alpha])
+        overhead = [*color, alpha]
+        overhead.extend(overhead_data)
+        sprite = Sprite(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
         cls._z += 1
         ShaderHandler.render_add(sprite)
 

@@ -4,37 +4,68 @@ from sweet.inputting import *
 from sweet.graphics.texture import *
 from pathlib import Path
 from pygame.locals import *
+from math import atan
 
 SOURCE = Path.cwd() / "app" / "sources"
 sw.looping.GameLoop.set_screen_size((sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height))
+main_cam = sw.camera.Camera.get_main_camera()
+view_size = Vec(480, 270)
+cam_factor = (view_size.y / sw.looping.GameLoop.view_height)
+main_cam.set_scale((cam_factor, cam_factor))
+sw.looping.GameLoop.set_background_color((255, 230, 147, 1))
+ShaderHandler.add_shader_file("floor", {"vao": [
+    ("iPos", 2),
+    ("iScale", 2),
+    ("iRot", 2),
+    ("iUVOff", 2),
+    ("iUVScale", 2),
+    ("iRgb", 3),
+    ("iAlpha", 1),
+    ("iView", 2),
+    ("iNPos", 3),
+    ("iNScale", 3),
+    ("iNRot", 3),
+    ]
+})
 sw.init()
 
 Texture.set_texture("PlayerBody", SOURCE / "player_body.png").upload()
 Texture.set_texture("PlayerLeg", SOURCE / "player_leg.png").upload()
 Texture.set_texture("pixel", SOURCE / "build" / "pixel.png").upload()
+Texture.set_texture("churchglass", SOURCE / "churchglass.png").upload()
+Texture.set_texture("churchwall", SOURCE / "churchwall.png").upload()
+Texture.set_texture("frontlane", SOURCE / "frontlane.png").upload()
+Texture.set_texture("churchlight", SOURCE / "light.png").upload()
+Texture.set_texture("vignette", SOURCE / "vignette.png").upload()
+Texture.set_texture("frontline", SOURCE / "frontline.png").upload()
+Texture.set_texture("ground", SOURCE / "floor.png").upload()
+Texture.set_texture("ground_l", SOURCE / "floor2.png").upload()
 
-grv = 30 / 60
+grv = 10 / 60
 
 class Player(Entity):
     def __init__(self, pos):
         super().__init__(pos, order=5, tick=True)
         self.spr_body = Texture.get_texture("PlayerBody")
         self.spr_legs = Texture.get_texture("PlayerLeg")
-        self.size = 0.2
+        self.size = .05
         self.scale = Vec(self.spr_body.get_width() * self.size, self.spr_body.get_height() * self.size)
         
-        vertices = [Vec(self.scale.x / 2, 0).rotate(angle * 360 / 15) for angle in range(15)]#self.scale / 2, self.scale.mirror_x() / 2, -self.scale / 2, self.scale.mirror_y() / 2]
+        vertices = [Vec(self.scale.x / 2, 0).rotate(angle * 360 / 15) for angle in range(15)]
 
         self.mask.add_polygon("main", sw.linalg.collision.Polygon(vertices))
 
-        self.jump_power = 10
-        self.speed = 120 / 60
+        self.jump_power = 4
+        self.speed = 36 / 60
         self.velocity = Vec(0, 0)
         self.floor_collision = False
         self.right_grip = False
         self.left_grip = False
 
         self.jumped = False
+
+        self.current_pos = Vec(0, 0)
+        self.offset = Vec(0, -30)
 
     def tick(self):
         self.velocity.y += grv
@@ -53,11 +84,11 @@ class Player(Entity):
                 self.jumped = True
             elif self.left_grip:
                 self.velocity.y = -self.jump_power
-                self.velocity.x = 15
+                self.velocity.x = self.jump_power
                 self.jumped = True
             elif self.right_grip:
                 self.velocity.y = -self.jump_power
-                self.velocity.x = -15
+                self.velocity.x = -self.jump_power
                 self.jumped = True
 
         if Input.get_released(K_SPACE):
@@ -88,20 +119,14 @@ class Player(Entity):
 
                 self.velocity.y *= 0.7
 
-        def response2(entity, other, data):
-            entity.pos += data.mtv * (data.is_b * 2 - 1)
-            other.pos -= data.mtv * (data.is_b * 2 - 1) / 2
-            parallel = Vec(data.mtv.y, -data.mtv.x)
-            parallel_magnitude = parallel.magnitude_squared()
-            if parallel.cross(entity.velocity) > 0:
-                entity.velocity = parallel * parallel.dot(entity.velocity) / parallel_magnitude
-
         sw.linalg.collision.Collision.collision_list(self, Block, apply_func=response)
-        sw.linalg.collision.Collision.collision_list(self, Block2, apply_func=response)
-        sw.linalg.collision.Collision.collision_list(self, Block3, apply_func=response2)
+
+        goal_pos = self.pos - view_size / 2 + self.offset
+        self.current_pos += (goal_pos - self.current_pos) / 10
+        main_cam.set_pos(self.current_pos.unp())
 
     def draw(self):
-        EntityTools.draw_image(self.spr_body, self.pos.unp(), self.scale.unp())
+        EntityTools.draw_image(self.spr_body, self.pos.unp(), self.scale.unp(), color=(127, 127, 127))
 
 class Block(Entity):
     def __init__(self, pos, size=(100, 100), angle=0):
@@ -111,61 +136,98 @@ class Block(Entity):
         self.mask.polygons["main"] = self.mask.get_polygon("main").rotate(self.angle)
 
     def draw(self):
-        EntityTools.draw_image(self.image, self.pos.unp(), self.scale.unp(), self.angle, color=(127, 127, 127))
+        pass
+        # EntityTools.draw_image(self.image, self.pos.unp(), self.scale.unp(), self.angle, color=(127, 127, 127))
 
-class Block3(Entity):
-    def __init__(self, pos, size=(100, 100), angle=0):
-        super().__init__(pos, image=Texture.get_texture("pixel"), scale=size, angle=angle, order=5, tick=True)
-        vertices = [self.scale / 2, self.scale.mirror_x() / 2, -self.scale / 2, self.scale.mirror_y() / 2]
-        self.mask.add_polygon("main", sw.linalg.collision.Polygon(vertices))
-        self.mask.polygons["main"] = self.mask.get_polygon("main").rotate(self.angle)
-        self.velocity = Vec(0, 0)
+def parallax(size, pos, rate):
+    camera_pos = Vec(*main_cam.get_pos())
+    position = Vec(camera_pos.x * rate, -size.y / 2) + pos
+    return position
 
-    def tick(self):
-        
-        self.velocity.y += grv
-        self.velocity.x *= 0.8
-
-        self.pos += self.velocity
-        print(self.velocity)
-
-        def response2(entity, other, data):
-            entity.pos += data.mtv * (data.is_b * 2 - 1)
-            parallel = Vec(data.mtv.y, -data.mtv.x)
-            parallel_magnitude = parallel.magnitude_squared()
-            if parallel.cross(entity.velocity) > 0:
-                entity.velocity = parallel * parallel.dot(entity.velocity) / parallel_magnitude
-
-        sw.linalg.collision.Collision.collision_list(self, Block, apply_func=response2)
+class Background(Entity):
+    def __init__(self):
+        super().__init__((0, 0), order=2)
+        self.front_background = Texture.get_texture("frontlane")
+        blend = (100, 66, 47)
+        factor = .2
+        self.front_background.set_image(self.front_background.apply_channels(self.front_background.get_image(),
+                                             lambda x: x * (1 - factor) + blend[0] * factor,
+                                             lambda x: x * (1 - factor) + blend[1] * factor,
+                                             lambda x: x * (1 - factor) + blend[2] * factor, lambda x: x))
+        self.front_background.upload()
+        self.front_bg_size = (self.front_background.get_width(), self.front_background.get_height())
+        self.back_background = Texture.get_texture("churchwall")
+        blend = (100, 66, 47)
+        factor = .33
+        self.back_background.set_image(self.back_background.apply_channels(self.back_background.get_image(),
+                                             lambda x: x * (1 - factor) + blend[0] * factor,
+                                             lambda x: x * (1 - factor) + blend[1] * factor,
+                                             lambda x: x * (1 - factor) + blend[2] * factor, lambda x: x))
+        self.back_background.upload()
+        self.back_bg_size = (self.back_background.get_width(), self.back_background.get_height())
+        self.ground = Texture.get_texture("ground")
+        self.ground_size = (self.ground.get_width(), self.ground.get_height())
+        self.ground_layer = Texture.get_texture("ground_l")
+        self.layer_size = (self.ground_layer.get_width(), self.ground_layer.get_height())
+        self.back_background_glass = Texture.get_texture("churchglass")
+        self.back_background_light = Texture.get_texture("churchlight")
+        self.back_light_size = (self.back_background_light.get_width(), self.back_background_light.get_height())
+        self.light = Texture.get_texture("churchlight")
+        self.pixel = Texture.get_texture("pixel")
+        self.t = 0
 
     def draw(self):
-        EntityTools.draw_image(self.image, self.pos.unp(), self.scale.unp(), self.angle, color=(127, 127, 127))
+        t = self.t
+        self.t += .5
+        def ease(t):
+            t = min(max(0, t), 1)
+            return 3 * t * t - 2 * t * t * t
+        camera_pos = Vec(*main_cam.get_pos())
+        camera_center = camera_pos + view_size / 2
 
-class Block2(Entity):
-    def __init__(self, pos, size=(100, 100), angle=0):
-        super().__init__(pos, image=Texture.get_texture("pixel"), scale=size, angle=angle, order=5, tick=True)
-        vertices = [self.scale / 2, self.scale.mirror_x() / 2, -self.scale / 2, self.scale.mirror_y() / 2]
-        self.default_shape = sw.linalg.collision.Polygon(vertices)
-        self.mask.add_polygon("main", self.default_shape)
-        self.mask.polygons["main"] = self.default_shape.rotate(self.angle)
-        
-    def tick(self):
-        self.angle += 1
-        self.mask.polygons["main"] = self.default_shape.rotate(self.angle)
+        for i in range(1):
+            ground_pos = parallax(Vec(*self.ground_size), Vec(self.ground_size[0] * i, 150 + self.ground_size[1]), 0)
+            print(sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height)
+            EntityTools.draw_image(self.ground, ground_pos.unp(), (1366 / 2 - 10, 760), program="floor", overhead_data=[sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height, camera_pos.x * 0, 0, 0, 1, 1, 1, 0, 0, 0])
 
-        def response2(entity, other, data):
-            entity.pos += data.mtv * (data.is_b * 2 - 1)
+        # EntityTools.draw_image(self.ground_layer, Vec(camera_center.x, ground_pos.y).unp(), self.layer_size)
 
-        sw.linalg.collision.Collision.collision_list(self, Block, apply_func=response2)
-        
+        for i in range(10):
+            back_bg_pos = parallax(Vec(*self.back_bg_size), Vec(self.back_bg_size[0] * i, 150), .333 * 1.36)
+            EntityTools.draw_image(self.back_background, back_bg_pos.unp(), self.back_bg_size, color=(185, 161, 141))
+            EntityTools.draw_image(self.back_background_glass, back_bg_pos.unp(), self.back_bg_size)
+        for i in range(10):
+            light_pos = parallax(Vec(*self.back_bg_size), Vec(self.back_bg_size[0] * i, 150), .333 * 1.36)
+            alpha_val = max(0, ease((200 - abs(light_pos.x - camera_center.x)) / 200))
+            EntityTools.draw_image(self.back_background_light, light_pos.unp(), self.back_light_size, alpha=alpha_val, color=(255, 236, 175))
+
+        for i in range(10):
+            front_bg_pos = parallax(Vec(*self.front_bg_size), Vec(self.front_bg_size[0] * i + 200, 150), 0.2)
+
+            EntityTools.draw_image(self.front_background, front_bg_pos.unp(), self.front_bg_size)
+
+class Foreground(Entity):
+    def __init__(self):
+        super().__init__((0, 0), order=6)
+        self.vignette = Texture.get_texture("vignette")
+        self.vignette_size = (self.vignette.get_width(), self.vignette.get_height())
+        self.front_pillar = Texture.get_texture("frontline")
+        self.pillar_size = (self.front_pillar.get_width() * 2, self.front_pillar.get_height() * 2)
+        self.vignette_alpha = 0.75
+
     def draw(self):
-        EntityTools.draw_image(self.image, self.pos.unp(), self.scale.unp(), self.angle, color=(127, 127, 127))
+        camera_pos = Vec(*main_cam.get_pos())
+        camera_center = camera_pos + view_size / 2
+    
+        for i in range(10):
+            front_bg_pos = Vec(-camera_pos.x, 0) * 10 + Vec(1440 * i, 0)
+            EntityTools.draw_image(self.front_pillar, front_bg_pos.unp(), self.pillar_size)
 
-a = Player((200, 200))
-Block((100, 400))
-Block((200, 400))
-Block((200, 650), (20000, 200))
-Block2((1000, 450), (200, 200), 20)
-Block3((100, 300))
+        EntityTools.draw_image(self.vignette, camera_center.unp(), (view_size * 1.01).unp(), alpha=self.vignette_alpha)
+        
+player = Player((200, 100))
+background = Background()
+foreground = Foreground()
+Block((100, 200), (10000, 100))
 
 sw.start()
