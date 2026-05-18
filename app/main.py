@@ -27,6 +27,7 @@ ShaderHandler.add_shader_file("floor", {"vao": [
     ("iNRot", 3),
     ]
 })
+ShaderHandler.add_shader_file("def3d", EntityTools.get_default_3d_shader_layout())
 sw.init()
 
 Texture.set_texture("PlayerBody", SOURCE / "player_body.png").upload()
@@ -207,6 +208,7 @@ class Foreground(Entity):
         self.vignette_size = (self.vignette.get_width(), self.vignette.get_height())
         self.front_pillar = Texture.get_texture("frontline")
         self.pillar_size = (self.front_pillar.get_width() * 2, self.front_pillar.get_height() * 2)
+        self.sprite = Texture.get_texture("frontlane")
         self.vignette_alpha = 0.6
 
     def draw(self):
@@ -218,6 +220,8 @@ class Foreground(Entity):
             EntityTools.draw_image(self.front_pillar, front_bg_pos.unp(), self.pillar_size)
 
         EntityTools.draw_image(self.vignette, camera_center.unp(), (view_size * 1.01).unp(), alpha=self.vignette_alpha)
+
+        EntityTools.draw_image_3d(self.sprite, (0, 0, 0), (1, 1, 1), (0, 0, 0), program="def3d")
         
 player = Player((200, 100))
 background = Background()

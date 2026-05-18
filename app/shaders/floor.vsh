@@ -77,7 +77,7 @@ void main()
     // ======================
 
     // pos *= iNScale;
-    pos *= vec3(iNScale.x * iScale.x / iView.x, iNScale.y * iScale.y / iView.y, iNScale.z);
+    pos *= vec3(iNScale.x * iScale.x / iView.x * 1.001, iNScale.y * iScale.y / iView.y * 1.001, iNScale.z);
 
     // ======================
     // ROTATION

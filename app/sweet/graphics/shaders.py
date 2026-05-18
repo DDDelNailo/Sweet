@@ -1,4 +1,4 @@
-from ..common import Draw, ConvertType, Rec, UVLocation, ShaderData
+from ..common import Draw, ConvertType, Rec, UVLocation, ShaderData, Sprite, Sprite3D
 import pygame as pg
 from pygame.locals import *
 from OpenGL.GL import *
@@ -816,34 +816,54 @@ class ShaderHandler:
         cls.set_shader(sprites[0].program)
 
         for s in sprites:
-            x, y = s.pos
-            w, h = s.scale
-            rotation = s.rotation
+            if isinstance(s, Sprite):
+                x, y = s.pos
+                w, h = s.scale
+                rotation = s.rotation
 
-            if not s.static:
-                pos = np.array([x, y, 0.0, 1.0], dtype=np.float32)
-                transformed = view_matrix @ pos
-                x, y = transformed[0], transformed[1]
+                if not s.static:
+                    pos = np.array([x, y, 0.0, 1.0], dtype=np.float32)
+                    transformed = view_matrix @ pos
+                    x, y = transformed[0], transformed[1]
 
-                w /= cam_scale[0]
-                h /= cam_scale[1]
-                rotation -= cam_angle
+                    w /= cam_scale[0]
+                    h /= cam_scale[1]
+                    rotation -= cam_angle
 
-            cos_r = cos(radians(rotation))
-            sin_r = sin(radians(rotation))
+                cos_r = cos(radians(rotation))
+                sin_r = sin(radians(rotation))
 
-            u0 = s.uv.x / cls._atlas_size
-            v0 = s.uv.y / cls._atlas_size
-            us = s.uv.w / cls._atlas_size
-            vs = s.uv.h / cls._atlas_size
+                u0 = s.uv.x / cls._atlas_size
+                v0 = s.uv.y / cls._atlas_size
+                us = s.uv.w / cls._atlas_size
+                vs = s.uv.h / cls._atlas_size
 
-            data.extend([
-                x, y,
-                w, h,
-                cos_r, sin_r,
-                u0, v0,
-                us, vs,
-            ])
+                data.extend([
+                    x, y,
+                    w, h,
+                    cos_r, sin_r,
+                    u0, v0,
+                    us, vs,
+                ])
+            else:
+                x, y, z = s.pos
+                w, h, t = s.scale
+                yaw, pitch, roll = s.rotation
+                
+                u0 = s.uv.x / cls._atlas_size
+                v0 = s.uv.y / cls._atlas_size
+                us = s.uv.w / cls._atlas_size
+                vs = s.uv.h / cls._atlas_size
+
+                data.extend([
+                    x, y, z,
+                    w, h, t,
+                    yaw, pitch, roll,
+                    u0, v0,
+                    us, vs,
+                    ShaderHandler.screen_size[0] / cam_scale[0],
+                    ShaderHandler.screen_size[1] / cam_scale[1],
+                ])
             data.extend(s.overhead)
 
         return np.array(data, dtype=np.float32)

@@ -3,36 +3,12 @@ from .graphics.texture import Texture, Imaging, Video
 from .camera import Camera, Cam
 from OpenGL.GL import *
 import pygame as pg
-from .common import TextureData
+from .common import TextureData, Sprite, Sprite3D
 from typing import Sequence
 from .linalg.vector import Vec
 import numpy as np
 from PIL import Image
 from dataclasses import dataclass
-
-@dataclass
-class Sprite:
-    pos: tuple
-    scale: tuple
-    layer: int
-    rotation: float
-    uv: tuple
-    tex_id: int
-    static: bool
-    program: bool
-    unit: int
-    overhead: list
-
-@dataclass
-class Sprite3D:
-    pos: tuple
-    scale: tuple
-    rotation: tuple
-    uv: tuple
-    tex_id: int
-    program: bool
-    unit: int
-    overhead: list
 
 class EntityTools:
     ShaderHandler.add_shader_file("def", layout = {
@@ -56,6 +32,19 @@ class EntityTools:
         ("iUVScale", 2),
         ("iRgb", 3),
         ("iAlpha", 1)]
+    }
+
+    @staticmethod
+    def get_default_3d_shader_layout():
+        return {"vao": [("iPos", 3),
+        ("iScale", 3),
+        ("iRot", 3),
+        ("iUVOff", 2),
+        ("iUVScale", 2),
+        ("iRgb", 3),
+        ("iAlpha", 1),
+        ("iView", 2),
+        ]
     }
 
     @staticmethod
@@ -117,7 +106,7 @@ class EntityTools:
         color = (color[0] / 255, color[1] / 255, color[2] / 255)
         overhead = [*color, alpha]
         overhead.extend(overhead_data)
-        sprite = Sprite3D(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
+        sprite = Sprite3D(pos, scale, angle, image.uv.uv, image.get_tex_id(), program, unit, overhead)
         cls._z += 1
         ShaderHandler.render_add(sprite)
 

@@ -4,18 +4,14 @@ layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_color;
 layout(location = 2) in vec2 a_texcoord;
 
-layout(location = 3) in vec2 iPos;
-layout(location = 4) in vec2 iScale;
-layout(location = 5) in vec2 iRot;
+layout(location = 3) in vec3 iPos;
+layout(location = 4) in vec3 iScale;
+layout(location = 5) in vec3 iRot;
 layout(location = 6) in vec2 iUVOff;
 layout(location = 7) in vec2 iUVScale;
 layout(location = 8) in vec3 iRgb;
 layout(location = 9) in float iAlpha;
-
 layout(location = 10) in vec2 iView;
-layout(location = 11) in vec3 iNPos;
-layout(location = 12) in vec3 iNScale;
-layout(location = 13) in vec3 iNRot;
 
 // (0,0,0) = centered on screen
 // scale = (1,1) = fills the entire screen
@@ -76,23 +72,23 @@ void main()
     // SCALE
     // ======================
 
-    // pos *= iNScale;
-    pos *= vec3(iNScale.x * iScale.x / iView.x, iNScale.y * iScale.y / iView.y, iNScale.z);
+    pos *= iScale;
+    // pos *= vec3(iNScale.x * iScale.x / iView.x, iNScale.y * iScale.y / iView.y, iNScale.z);
 
     // ======================
     // ROTATION
     // ======================
 
-    pos = rotX(iNRot.x) * pos;
-    pos = rotY(iNRot.y) * pos;
-    pos = rotZ(iNRot.z) * pos;
+    pos = rotX(iRot.x) * pos;
+    pos = rotY(iRot.y) * pos;
+    pos = rotZ(iRot.z) * pos;
 
     // ======================
     // TRANSLATION
     // ======================
 
-    // pos += iNPos;
-    pos += vec3(iNPos.x + iPos.x / iView.x, iNPos.y, iNPos.z);
+    pos += iPos;
+    // pos += vec3(iNPos.x + iPos.x / iView.x, iNPos.y, iNPos.z);
 
     // ======================
     // PERSPECTIVE
