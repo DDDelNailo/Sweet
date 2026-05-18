@@ -25,11 +25,12 @@ layout(location = 13) in vec3 iNRot;
 // positive z = farther away
 // negative z = closer to camera
 
-out vec2 v_texcoord;
 out vec3 v_color;
 out vec3 v_rgb;
 out float v_alpha;
 out vec2 v_view_size;
+out vec2 v_texcoord;
+out float v_inv_depth;
 
 mat3 rotX(float a)
 {
@@ -75,6 +76,7 @@ void main()
     // SCALE
     // ======================
 
+    // pos *= iNScale;
     pos *= vec3(iNScale.x * iScale.x / iView.x, iNScale.y * iScale.y / iView.y, iNScale.z);
 
     // ======================
@@ -89,7 +91,8 @@ void main()
     // TRANSLATION
     // ======================
 
-    pos += iNPos;
+    // pos += iNPos;
+    pos += vec3(iNPos.x + iPos.x / iView.x, iNPos.y, iNPos.z);
 
     // ======================
     // PERSPECTIVE
@@ -113,7 +116,12 @@ void main()
         1.0
     );
 
-    v_texcoord = a_texcoord * iUVScale + iUVOff;
+    vec2 uv = a_texcoord * iUVScale + iUVOff;
+
+    v_inv_depth = 1.0 / depth;
+    v_texcoord = uv * v_inv_depth;
+
+    gl_Position.xy += vec2(0, -iPos.y / iView.y * 2) * gl_Position.w;
 
     v_color = a_color;
     v_rgb = iRgb;

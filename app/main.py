@@ -65,7 +65,7 @@ class Player(Entity):
         self.jumped = False
 
         self.current_pos = Vec(0, 0)
-        self.offset = Vec(0, -30)
+        self.offset = Vec(0, -100)
 
     def tick(self):
         self.velocity.y += grv
@@ -174,23 +174,17 @@ class Background(Entity):
         self.back_light_size = (self.back_background_light.get_width(), self.back_background_light.get_height())
         self.light = Texture.get_texture("churchlight")
         self.pixel = Texture.get_texture("pixel")
-        self.t = 0
 
     def draw(self):
-        t = self.t
-        self.t += .5
         def ease(t):
             t = min(max(0, t), 1)
             return 3 * t * t - 2 * t * t * t
         camera_pos = Vec(*main_cam.get_pos())
         camera_center = camera_pos + view_size / 2
 
-        for i in range(1):
+        for i in range(10):
             ground_pos = parallax(Vec(*self.ground_size), Vec(self.ground_size[0] * i, 150 + self.ground_size[1]), 0)
-            print(sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height)
-            EntityTools.draw_image(self.ground, ground_pos.unp(), (1366 / 2 - 10, 760), program="floor", overhead_data=[sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height, camera_pos.x * 0, 0, 0, 1, 1, 1, 0, 0, 0])
-
-        # EntityTools.draw_image(self.ground_layer, Vec(camera_center.x, ground_pos.y).unp(), self.layer_size)
+            EntityTools.draw_image(self.ground, Vec(0, ground_pos.y).unp(), (self.ground_size[0], self.ground_size[1]), program="floor", overhead_data=[sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height, i, .86, 0, 1, 3, 1, 2.3, 0, 0])
 
         for i in range(10):
             back_bg_pos = parallax(Vec(*self.back_bg_size), Vec(self.back_bg_size[0] * i, 150), .333 * 1.36)
