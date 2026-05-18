@@ -102,7 +102,7 @@ void main()
     float cameraDist = 1.0;
 
     // Prevent division explosion
-    float depth = max(0.01, cameraDist + pos.z);
+    float depth = max(0.001, cameraDist + pos.z);
 
     // Perspective divide manually
     vec2 projected = pos.xy / depth;
