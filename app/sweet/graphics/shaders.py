@@ -787,8 +787,7 @@ class ShaderHandler:
 
         for sprite in cls._render_list:
             same_program = True
-            # if sprite.program == None: sprite.program = "def"
-            if not sprite.program == None and not sprite.program == last_program:
+            if (not sprite.program == None and not sprite.program == last_program) or (sprite.program == None and sprite.program != "def"):
                 same_program = False
 
             same_batch = sprite.tex_id == last_id and sprite.unit == last_unit and same_program

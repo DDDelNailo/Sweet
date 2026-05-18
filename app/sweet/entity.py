@@ -23,6 +23,17 @@ class Sprite:
     unit: int
     overhead: list
 
+@dataclass
+class Sprite3D:
+    pos: tuple
+    scale: tuple
+    rotation: tuple
+    uv: tuple
+    tex_id: int
+    program: bool
+    unit: int
+    overhead: list
+
 class EntityTools:
     ShaderHandler.add_shader_file("def", layout = {
         "vao": [("iPos", 2),
@@ -88,6 +99,25 @@ class EntityTools:
         overhead = [*color, alpha]
         overhead.extend(overhead_data)
         sprite = Sprite(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
+        cls._z += 1
+        ShaderHandler.render_add(sprite)
+
+    @classmethod
+    def draw_image_3d(cls,
+                   image: Imaging | Video,
+                   pos: tuple,
+                   scale: tuple,
+                   angle: tuple,
+                   color: tuple=(255, 255, 255),
+                   alpha: float=1,
+                   program: str=None,
+                   unit=GL_TEXTURE0,
+                   overhead_data=[]) -> None:
+
+        color = (color[0] / 255, color[1] / 255, color[2] / 255)
+        overhead = [*color, alpha]
+        overhead.extend(overhead_data)
+        sprite = Sprite3D(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
         cls._z += 1
         ShaderHandler.render_add(sprite)
 

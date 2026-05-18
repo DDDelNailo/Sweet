@@ -15,9 +15,15 @@ void main()
 {
     vec2 uv = v_texcoord / v_inv_depth;
     vec4 texColor = texture(u_texture, uv);
-    float t = 1 - (gl_FragCoord.y - 350.0) / 200.0;
-    texColor.xyz = mix(vec3(100.0 / 255.0 / 2.0, 66.0 / 255.0 / 2.0, 47.0 / 255.0 / 2.0), texColor.xyz, vec3(t, t, t));
-    texColor.xyz *= (gl_FragCoord.y - 100.0) / 300.0;
-    texColor.xyz = mix(vec3(100.0 / 255.0 / 2.0, 66.0 / 255.0 / 2.0, 47.0 / 255.0 / 2.0), texColor.xyz, vec3(.6, .6, .6));
+
+    float t = min(1.0, max(0.0, uv.y * 6.56 - 0.72));
+    
+    texColor.xyz *= min(1.0, 9.5 - uv.y / .02);
+    
+    texColor.xyz *= min(1.0, gl_FragCoord.x / 1000.0);
+    texColor.xyz *= min(1.0, -(gl_FragCoord.x - v_view_size.x) / 1000.0);
+
+    texColor.xyz = mix(vec3(25.0 / 255.0, 15.0 / 255.0, 10.0 / 255.0), texColor.xyz, vec3(t, t, t));
+    
     FragColor = texColor * vec4(v_color * v_rgb, v_alpha);
 }

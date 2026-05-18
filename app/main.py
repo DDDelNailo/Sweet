@@ -184,7 +184,7 @@ class Background(Entity):
 
         for i in range(-10, 10):
             ground_pos = parallax(Vec(*self.ground_size), Vec(self.ground_size[0] * i, 150 + self.ground_size[1]), 0)
-            EntityTools.draw_image(self.ground, Vec(0, ground_pos.y).unp(), (self.ground_size[0], self.ground_size[1]), program="floor", overhead_data=[sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height, i, .86, 0, 1, 3.5, 1, 2.3, 0, 0])
+            EntityTools.draw_image(self.ground, Vec(0, ground_pos.y).unp(), (self.ground_size[0], self.ground_size[1]), program="floor", overhead_data=[sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height, self.ground_size[0] / cam_factor * i / sw.looping.GameLoop.view_width, .86, 0, 1, 3.5, 1, 2.3, 0, 0])
 
         for i in range(-10, 10):
             back_bg_pos = parallax(Vec(*self.back_bg_size), Vec(self.back_bg_size[0] * i, 150), .333 * 1.36)
@@ -207,7 +207,7 @@ class Foreground(Entity):
         self.vignette_size = (self.vignette.get_width(), self.vignette.get_height())
         self.front_pillar = Texture.get_texture("frontline")
         self.pillar_size = (self.front_pillar.get_width() * 2, self.front_pillar.get_height() * 2)
-        self.vignette_alpha = 0.85
+        self.vignette_alpha = 0.6
 
     def draw(self):
         camera_pos = Vec(*main_cam.get_pos())
