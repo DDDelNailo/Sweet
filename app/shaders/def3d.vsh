@@ -9,9 +9,9 @@ layout(location = 4) in vec3 iScale;
 layout(location = 5) in vec3 iRot;
 layout(location = 6) in vec2 iUVOff;
 layout(location = 7) in vec2 iUVScale;
-layout(location = 8) in vec3 iRgb;
-layout(location = 9) in float iAlpha;
-layout(location = 10) in vec2 iView;
+layout(location = 8) in vec2 iView;
+layout(location = 9) in vec3 iRgb;
+layout(location = 10) in float iAlpha;
 
 // (0,0,0) = centered on screen
 // scale = (1,1) = fills the entire screen
