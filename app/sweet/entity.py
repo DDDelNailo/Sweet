@@ -41,9 +41,9 @@ class EntityTools:
         ("iRot", 3),
         ("iUVOff", 2),
         ("iUVScale", 2),
+        ("iView", 2),
         ("iRgb", 3),
         ("iAlpha", 1),
-        ("iView", 2),
         ]
     }
 
