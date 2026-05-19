@@ -65,10 +65,6 @@ class EntityTools:
         return Texture.get_texture(tex)
 
     @staticmethod
-    def default_mvp(entity) -> np.array:
-        return ShaderHandler.affine_transform((entity.x, entity.y), (entity.width, entity.height), entity.angle, True)
-
-    @staticmethod
     def default_draw(entity) -> None:
         ShaderHandler.render(entity.get_mvp(), Texture.get_texture(entity.image))
 
@@ -85,6 +81,7 @@ class EntityTools:
                    unit=GL_TEXTURE0,
                    overhead_data=[]) -> None:
 
+        if program == None: program = "def"
         color = (color[0] / 255, color[1] / 255, color[2] / 255)
         overhead = [*color, alpha]
         overhead.extend(overhead_data)
@@ -105,6 +102,7 @@ class EntityTools:
                    unit=GL_TEXTURE0,
                    overhead_data=[]) -> None:
 
+        if program == None: program = "def3d"
         color = (color[0] / 255, color[1] / 255, color[2] / 255)
         overhead = [*color, alpha]
         overhead.extend(overhead_data)

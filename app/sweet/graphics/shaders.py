@@ -3,6 +3,7 @@ import pygame as pg
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
+import glm
 import numpy as np
 from pathlib import Path
 from math import sin, cos, radians, tan, atan
@@ -208,24 +209,6 @@ class ShaderHandler:
             [0, 0, 0, 1]
         ], dtype=np.float32)
 
-    @staticmethod
-    def get_perspective(fov, aspect, near, far):
-        f = 1.0 / tan(fov / 2.0)
-
-        return np.array([
-            [f / aspect, 0, 0, 0],
-            [0, f, 0, 0],
-            [0, 0, (far + near) / (near - far),
-                (2 * far * near) / (near - far)],
-            [0, 0, -1, 0]
-        ], dtype=np.float32)
-
-    @staticmethod
-    def pixels_per_unit(viewport_height, fov_deg, z):
-        return viewport_height / (
-            2.0 * tan(radians(fov_deg) / 2.0) * abs(z)
-        )
-
     @classmethod
     def new_atlas(cls) -> None:
         atlas = Atlas(cls._atlas_size, cls._atlas_size, uuid.uuid4().hex)
@@ -234,66 +217,6 @@ class ShaderHandler:
         cls._atlas_array.append(atlas)
         cls._atlas_loc[location.tex_id] = atlas
 
-    @classmethod
-    def affine_transform(cls, pos: tuple, scale: tuple, angle: int, static: bool) -> np.array:
-        c: float
-        s: float
-        c, s = cos(angle), sin(angle)
-
-        tx: float
-        ty: float
-        tx = pos[0] * 2 / cls.screen_size[0]
-        ty = pos[1] * 2 / cls.screen_size[1]
-
-        if not static:
-            main_cam = Camera.get_main_camera()
-            cam_pos = main_cam.get_pos()
-            cam_scale = main_cam.get_scale()
-            cam_angle = main_cam.get_angle()
-            cam_c, cam_s = cos(cam_angle), sin(cam_angle)
-            tx = (pos[0] - cam_pos[0]) * 2 / cls.screen_size[0]
-            ty = (pos[1] - cam_pos[1]) * 2 / cls.screen_size[1]
-
-            cam_rotation_z = np.array([
-                [ cam_c, -cam_s * (cls.screen_size[0] / cls.screen_size[1]), 0, 0],
-                [ cam_s,  cam_c * (cls.screen_size[0] / cls.screen_size[1]), 0, 0],
-                [ 0,  0, 1, 0],
-                [ 0,  0, 0, 1]
-            ], dtype=np.float32)
-
-            cam_scaling = np.array([
-                [cam_scale[1], 0, 0, 0],
-                [0, cam_scale[0] * cls.screen_size[1] / cls.screen_size[0], 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1]
-            ], dtype=np.float32)
-
-        rotation_z = np.array([
-            [ c, -s * (cls.screen_size[0] / cls.screen_size[1]), 0, 0],
-            [ s,  c * (cls.screen_size[0] / cls.screen_size[1]), 0, 0],
-            [ 0,  0, 1, 0],
-            [ 0,  0, 0, 1]
-        ], dtype=np.float32)
-
-        scaling = np.array([
-            [scale[0] * 2 / cls.screen_size[0], 0, 0, 0],
-            [0, scale[1] * 2 / cls.screen_size[0], 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ], dtype=np.float32)
-
-        translation = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [tx - 1, 1 - ty, 0, 1]
-        ], dtype=np.float32)
-
-        if static:
-            return scaling @ rotation_z @ translation
-
-        return scaling @ rotation_z @ translation @ cam_scaling @ cam_rotation_z
-    
     @classmethod
     def get_uniform_func(cls, data_type: str) -> Callable:
         return cls._uniform_mappings[data_type]
@@ -723,15 +646,6 @@ class ShaderHandler:
     def remove_texture(cls, occupation: str) -> None:
         glDeleteTextures([cls._occupated_textures[occupation]])
         cls._occupated_textures.pop(occupation)
-
-    @staticmethod
-    def ortho(left, right, bottom, top, near=-1, far=1) -> np.array:
-        return np.array([
-            [2/(right-left), 0, 0, -(right+left)/(right-left)],
-            [0, 2/(top-bottom), 0, -(top+bottom)/(top-bottom)],
-            [0, 0, -2/(far-near), -(far+near)/(far-near)],
-            [0, 0, 0, 1]
-        ], dtype=np.float32)
     
     @staticmethod
     def build_view(cam_pos, cam_angle, cam_scale, pivot) -> np.array:
@@ -795,11 +709,16 @@ class ShaderHandler:
     @classmethod
     def render_all(cls) -> None:
         mvp = cls.ortho(0, cls.screen_size[0], cls.screen_size[1], 0)
-        mvp3d = cls.get_perspective(
-            fov=2 * atan(0.5),
-            aspect=cls.screen_size[1] / cls.screen_size[0],
-            near=0.01,
-            far=100.0
+        mvp3d = glm.perspective(
+            glm.radians(70.0),
+            cls.screen_size[1] / cls.screen_size[0],
+            0.1,
+            1000.0
+        )
+        view3d = glm.lookAt(
+            glm.vec3(0, 0, 5),  # camera position
+            glm.vec3(0, 0, 0),  # target
+            glm.vec3(0, 1, 0)   # up vector
         )
         cam = Camera.get_main_camera()
         cam_pos = cam.get_pos()
@@ -814,19 +733,19 @@ class ShaderHandler:
 
         for sprite in cls._render_list:
             same_program = True
-            if (not sprite.program == None and not sprite.program == last_program) or (sprite.program == None and sprite.program != "def"):
+            if (not sprite.program == last_program):
                 same_program = False
 
             same_batch = sprite.tex_id == last_id and sprite.unit == last_unit and same_program
             if not same_batch and batch:
-                    if isinstance(batch[0], Sprite):
-                        data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
-                        cls.render(mvp, last_id, data, unit=last_unit)
-                    else:
-                        data = cls.build_instance_buffer_3d(batch)
-                        shader_program = cls.get_shader_program(batch[0].program)  
-                        cls.render(mvp3d, last_id, data, unit=last_unit, mvp_loc=glGetUniformLocation(shader_program, "uProjection"))
-                    batch = []
+                if isinstance(batch[0], Sprite):
+                    data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
+                    cls.render(mvp, last_id, data, unit=last_unit)
+                else:
+                    data = cls.build_instance_buffer_3d(batch)
+                    shader_program = cls.get_shader_program(batch[0].program)  
+                    cls.render(mvp3d, last_id, data, unit=last_unit, mvp_loc=glGetUniformLocation(shader_program, "uProjection"))
+                batch = []
 
             batch.append(sprite)
             last_id = sprite.tex_id
@@ -849,7 +768,6 @@ class ShaderHandler:
     def build_instance_buffer(cls, sprites, view_matrix, cam_scale, cam_angle) -> np.array:
         data = []
 
-        if sprites[0].program == None: sprites[0].program = "def"
         cls.set_shader(sprites[0].program)
 
         for s in sprites:
@@ -889,13 +807,20 @@ class ShaderHandler:
     def build_instance_buffer_3d(cls, sprites) -> np.array:
         data = []
 
-        if sprites[0].program == None: sprites[0].program = "def"
         cls.set_shader(sprites[0].program)
 
         for s in sprites:
             x, y, z = s.pos
             w, h, t = s.scale
-            yaw, pitch, roll = s.rotation
+            pitch, yaw, roll = s.rotation
+
+            model = glm.mat4(1.0)
+
+            model = glm.translate(model, glm.vec3(x, y, z))
+            model = glm.rotate(model, pitch, glm.vec3(1,0,0))
+            model = glm.rotate(model, yaw, glm.vec3(0,1,0))
+            model = glm.rotate(model, roll, glm.vec3(0,0,1))
+            model = glm.scale(model, glm.vec3(w, h, t))
             
             u0 = s.uv.x / cls._atlas_size
             v0 = s.uv.y / cls._atlas_size
@@ -904,16 +829,16 @@ class ShaderHandler:
 
             o_x, o_y = s.offset
 
-            data.extend([
-                x, y, z,
-                w, h, t,
-                yaw, pitch, roll,
-                o_x, o_y,
-                u0, v0,
-                us, vs,
-                ShaderHandler.screen_size[0],
-                ShaderHandler.screen_size[1],
-            ])
-            data.extend(s.overhead)
+            # data.extend([
+            #     x, y, z,
+            #     w, h, t,
+            #     yaw, pitch, roll,
+            #     o_x, o_y,
+            #     u0, v0,
+            #     us, vs,
+            #     ShaderHandler.screen_size[0],
+            #     ShaderHandler.screen_size[1],
+            # ])
+            # data.extend(s.overhead)
 
         return np.array(data, dtype=np.float32)
