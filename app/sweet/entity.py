@@ -39,6 +39,7 @@ class EntityTools:
         return {"vao": [("iPos", 3),
         ("iScale", 3),
         ("iRot", 3),
+        ("iOffset", 2),
         ("iUVOff", 2),
         ("iUVScale", 2),
         ("iView", 2),
@@ -96,7 +97,8 @@ class EntityTools:
                    image: Imaging | Video,
                    pos: tuple,
                    scale: tuple,
-                   angle: tuple,
+                   angle: tuple=(0, 0, 0),
+                   offset: tuple=(0, 0),
                    color: tuple=(255, 255, 255),
                    alpha: float=1,
                    program: str=None,
@@ -106,7 +108,7 @@ class EntityTools:
         color = (color[0] / 255, color[1] / 255, color[2] / 255)
         overhead = [*color, alpha]
         overhead.extend(overhead_data)
-        sprite = Sprite3D(pos, scale, angle, image.uv.uv, image.get_tex_id(), program, unit, overhead)
+        sprite = Sprite3D(pos, scale, angle, offset, image.uv.uv, image.get_tex_id(), program, unit, overhead)
         cls._z += 1
         ShaderHandler.render_add(sprite)
 

@@ -87,6 +87,7 @@ class Sprite3D:
     pos: tuple
     scale: tuple
     rotation: tuple
+    offset: tuple
     uv: tuple
     tex_id: int
     program: bool

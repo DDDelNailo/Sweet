@@ -5,7 +5,7 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
 import numpy as np
 from pathlib import Path
-from math import sin, cos, radians
+from math import sin, cos, radians, tan, atan
 from sweet.camera import Camera
 from typing import Callable, Sequence, Type
 import uuid
@@ -199,6 +199,7 @@ class ShaderHandler:
     _CWD = Path.cwd()
     _SHADERS = _CWD / "app" / "shaders"
 
+    @staticmethod
     def ortho(left, right, bottom, top, near=-1, far=1):
         return np.array([
             [2/(right-left), 0, 0, -(right+left)/(right-left)],
@@ -206,6 +207,24 @@ class ShaderHandler:
             [0, 0, -2/(far-near), -(far+near)/(far-near)],
             [0, 0, 0, 1]
         ], dtype=np.float32)
+
+    @staticmethod
+    def get_perspective(fov, aspect, near, far):
+        f = 1.0 / tan(fov / 2.0)
+
+        return np.array([
+            [f / aspect, 0, 0, 0],
+            [0, f, 0, 0],
+            [0, 0, (far + near) / (near - far),
+                (2 * far * near) / (near - far)],
+            [0, 0, -1, 0]
+        ], dtype=np.float32)
+
+    @staticmethod
+    def pixels_per_unit(viewport_height, fov_deg, z):
+        return viewport_height / (
+            2.0 * tan(radians(fov_deg) / 2.0) * abs(z)
+        )
 
     @classmethod
     def new_atlas(cls) -> None:
@@ -747,8 +766,10 @@ class ShaderHandler:
         cls._render_list.append(sprite)
 
     @classmethod
-    def render(cls, mvp: np.array, texture: Draw, data: np.array, ssbo_data: np.array=[], unit=GL_TEXTURE0) -> None:
-        glUniformMatrix4fv(cls.u_mvp_loc, 1, GL_TRUE, mvp)
+    def render(cls, mvp: np.array, texture: Draw, data: np.array, ssbo_data: np.array=[], unit=GL_TEXTURE0, mvp_loc=None) -> None:
+        if mvp_loc == None:
+            mvp_loc = cls.u_mvp_loc
+        glUniformMatrix4fv(mvp_loc, 1, GL_TRUE, mvp)
         
         glBindBuffer(GL_ARRAY_BUFFER, cls.instance_vbo)
         glBufferSubData(GL_ARRAY_BUFFER, 0, data.nbytes, data)
@@ -774,6 +795,12 @@ class ShaderHandler:
     @classmethod
     def render_all(cls) -> None:
         mvp = cls.ortho(0, cls.screen_size[0], cls.screen_size[1], 0)
+        mvp3d = cls.get_perspective(
+            fov=2 * atan(0.5),
+            aspect=cls.screen_size[1] / cls.screen_size[0],
+            near=0.01,
+            far=100.0
+        )
         cam = Camera.get_main_camera()
         cam_pos = cam.get_pos()
         cam_scale = cam.get_scale()
@@ -792,8 +819,13 @@ class ShaderHandler:
 
             same_batch = sprite.tex_id == last_id and sprite.unit == last_unit and same_program
             if not same_batch and batch:
-                    data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
-                    cls.render(mvp, last_id, data, unit=last_unit)
+                    if isinstance(batch[0], Sprite):
+                        data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
+                        cls.render(mvp, last_id, data, unit=last_unit)
+                    else:
+                        data = cls.build_instance_buffer_3d(batch)
+                        shader_program = cls.get_shader_program(batch[0].program)  
+                        cls.render(mvp3d, last_id, data, unit=last_unit, mvp_loc=glGetUniformLocation(shader_program, "uProjection"))
                     batch = []
 
             batch.append(sprite)
@@ -803,8 +835,13 @@ class ShaderHandler:
                 last_program = sprite.program
 
         if batch:
-            data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
-            cls.render(mvp, last_id, data, unit=last_unit)
+            if isinstance(batch[0], Sprite):
+                data = cls.build_instance_buffer(batch, view, cam_scale, cam_angle)
+                cls.render(mvp, last_id, data, unit=last_unit)
+            else:
+                data = cls.build_instance_buffer_3d(batch)
+                shader_program = cls.get_shader_program(batch[0].program)
+                cls.render(mvp3d, last_id, data, unit=last_unit, mvp_loc=glGetUniformLocation(shader_program, "uProjection"))
 
         cls._render_list = []
 
@@ -816,54 +853,67 @@ class ShaderHandler:
         cls.set_shader(sprites[0].program)
 
         for s in sprites:
-            if isinstance(s, Sprite):
-                x, y = s.pos
-                w, h = s.scale
-                rotation = s.rotation
+            x, y = s.pos
+            w, h = s.scale
+            rotation = s.rotation
 
-                if not s.static:
-                    pos = np.array([x, y, 0.0, 1.0], dtype=np.float32)
-                    transformed = view_matrix @ pos
-                    x, y = transformed[0], transformed[1]
+            if not s.static:
+                pos = np.array([x, y, 0.0, 1.0], dtype=np.float32)
+                transformed = view_matrix @ pos
+                x, y = transformed[0], transformed[1]
 
-                    w /= cam_scale[0]
-                    h /= cam_scale[1]
-                    rotation -= cam_angle
+                w /= cam_scale[0]
+                h /= cam_scale[1]
+                rotation -= cam_angle
 
-                cos_r = cos(radians(rotation))
-                sin_r = sin(radians(rotation))
+            cos_r = cos(radians(rotation))
+            sin_r = sin(radians(rotation))
 
-                u0 = s.uv.x / cls._atlas_size
-                v0 = s.uv.y / cls._atlas_size
-                us = s.uv.w / cls._atlas_size
-                vs = s.uv.h / cls._atlas_size
+            u0 = s.uv.x / cls._atlas_size
+            v0 = s.uv.y / cls._atlas_size
+            us = s.uv.w / cls._atlas_size
+            vs = s.uv.h / cls._atlas_size
 
-                data.extend([
-                    x, y,
-                    w, h,
-                    cos_r, sin_r,
-                    u0, v0,
-                    us, vs,
-                ])
-            else:
-                x, y, z = s.pos
-                w, h, t = s.scale
-                yaw, pitch, roll = s.rotation
-                
-                u0 = s.uv.x / cls._atlas_size
-                v0 = s.uv.y / cls._atlas_size
-                us = s.uv.w / cls._atlas_size
-                vs = s.uv.h / cls._atlas_size
+            data.extend([
+                x, y,
+                w, h,
+                cos_r, sin_r,
+                u0, v0,
+                us, vs,
+            ])
+            data.extend(s.overhead)
 
-                data.extend([
-                    x, y, z,
-                    w, h, t,
-                    yaw, pitch, roll,
-                    u0, v0,
-                    us, vs,
-                    ShaderHandler.screen_size[0] / cam_scale[0],
-                    ShaderHandler.screen_size[1] / cam_scale[1],
-                ])
+        return np.array(data, dtype=np.float32)
+
+    @classmethod
+    def build_instance_buffer_3d(cls, sprites) -> np.array:
+        data = []
+
+        if sprites[0].program == None: sprites[0].program = "def"
+        cls.set_shader(sprites[0].program)
+
+        for s in sprites:
+            x, y, z = s.pos
+            w, h, t = s.scale
+            yaw, pitch, roll = s.rotation
+            
+            u0 = s.uv.x / cls._atlas_size
+            v0 = s.uv.y / cls._atlas_size
+            us = s.uv.w / cls._atlas_size
+            vs = s.uv.h / cls._atlas_size
+
+            o_x, o_y = s.offset
+
+            data.extend([
+                x, y, z,
+                w, h, t,
+                yaw, pitch, roll,
+                o_x, o_y,
+                u0, v0,
+                us, vs,
+                ShaderHandler.screen_size[0],
+                ShaderHandler.screen_size[1],
+            ])
             data.extend(s.overhead)
 
         return np.array(data, dtype=np.float32)

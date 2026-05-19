@@ -7,26 +7,19 @@ layout(location = 2) in vec2 a_texcoord;
 layout(location = 3) in vec3 iPos;
 layout(location = 4) in vec3 iScale;
 layout(location = 5) in vec3 iRot;
-layout(location = 6) in vec2 iUVOff;
-layout(location = 7) in vec2 iUVScale;
-layout(location = 8) in vec2 iView;
-layout(location = 9) in vec3 iRgb;
-layout(location = 10) in float iAlpha;
+layout(location = 6) in vec2 iOffset;
+layout(location = 7) in vec2 iUVOff;
+layout(location = 8) in vec2 iUVScale;
+layout(location = 9) in vec2 iView;
+layout(location = 10) in vec3 iRgb;
+layout(location = 11) in float iAlpha;
 
-// (0,0,0) = centered on screen
-// scale = (1,1) = fills the entire screen
-// position.x = 1 = move by exactly one screen width
-// position.y = 1 = move by exactly one screen height
-// z = 0 = normal depth
-// positive z = farther away
-// negative z = closer to camera
+uniform mat4 uProjection;
 
 out vec3 v_color;
 out vec3 v_rgb;
 out float v_alpha;
-out vec2 v_view_size;
 out vec2 v_texcoord;
-out float v_inv_depth;
 
 mat3 rotX(float a)
 {
@@ -68,60 +61,41 @@ void main()
 {
     vec3 pos = a_position;
 
-    // ======================
-    // SCALE
-    // ======================
+    // scale in screen-space style units
+    pos *= vec3(
+        iScale.x * iView.y / iView.x / iView.x,
+        iScale.y / iView.y,
+        iScale.z
+    );
 
-    pos *= iScale;
-    // pos *= vec3(iNScale.x * iScale.x / iView.x, iNScale.y * iScale.y / iView.y, iNScale.z);
-
-    // ======================
-    // ROTATION
-    // ======================
-
+    // rotation
     pos = rotX(iRot.x) * pos;
     pos = rotY(iRot.y) * pos;
     pos = rotZ(iRot.z) * pos;
 
-    // ======================
-    // TRANSLATION
-    // ======================
-
-    pos += iPos;
-    // pos += vec3(iNPos.x + iPos.x / iView.x, iNPos.y, iNPos.z);
-
-    // ======================
-    // PERSPECTIVE
-    // ======================
-
-    // Camera distance from z=0 plane
-    float cameraDist = 1.0;
-
-    // Prevent division explosion
-    float depth = max(0.001, cameraDist + pos.z);
-
-    // Perspective divide manually
-    vec2 projected = pos.xy / depth;
-
-    // Convert "screen units" to clip space
-    projected *= 2.0;
-
-    gl_Position = vec4(
-        projected,
-        pos.z,
-        1.0
+    // translation
+    pos += vec3(
+        iPos.x / iView.x,
+        iPos.y / iView.y,
+        iPos.z
     );
 
-    vec2 uv = a_texcoord * iUVScale + iUVOff;
+    // REAL projection
+    gl_Position = uProjection * vec4(pos, 1.0);
 
-    v_inv_depth = 1.0 / depth;
-    v_texcoord = uv * v_inv_depth;
+    // screen offset
+    gl_Position.xy += vec2(
+        iOffset.x / iView.x * 2.0,
+        iOffset.y / iView.y * 2.0
+    ) * gl_Position.w;
+    
+    // normal UVs
+    v_texcoord =
+        vec2(a_texcoord.x, 1.0 - a_texcoord.y)
+        * iUVScale
+        + iUVOff;
 
-    gl_Position.xy += vec2(0, -iPos.y / iView.y * 2) * gl_Position.w;
-
-    v_texcoord.y = -v_texcoord.y;
     v_color = a_color;
     v_rgb = iRgb;
     v_alpha = iAlpha;
-    v_view_size = iView;
 }
