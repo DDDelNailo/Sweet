@@ -33,7 +33,6 @@ void main()
     v_color = a_color;
 
     v_texcoord = a_texcoord * iUVScale + iUVOff;
-
     v_rgb = iRgb;
     v_alpha = iAlpha;
 }

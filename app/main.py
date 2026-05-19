@@ -221,7 +221,7 @@ class Foreground(Entity):
 
         EntityTools.draw_image(self.vignette, camera_center.unp(), (view_size * 1.01).unp(), alpha=self.vignette_alpha)
 
-        EntityTools.draw_image_3d(self.sprite, (0, 0, 0), (1, 1, 1), (0, 0, 0), program="def3d")
+        # EntityTools.draw_image_3d(self.sprite, (0, 0, 0), (1, 1, 1), (0, 0, 0), program="def3d")
         
 player = Player((200, 100))
 background = Background()

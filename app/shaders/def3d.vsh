@@ -119,6 +119,7 @@ void main()
 
     gl_Position.xy += vec2(0, -iPos.y / iView.y * 2) * gl_Position.w;
 
+    v_texcoord.y = -v_texcoord.y;
     v_color = a_color;
     v_rgb = iRgb;
     v_alpha = iAlpha;
