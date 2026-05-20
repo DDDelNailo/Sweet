@@ -173,11 +173,235 @@ class Atlas:
 
         return None
 
-class ShaderHandler:
-    screen_size: tuple = (800, 600)
-    _shader_files: dict[ShaderData] = {}
-    _occupated_textures: dict[int] = {}
-    _current_program: str = None
+class ShaderTexture:
+    _atlas_size = 1024
+    _atlas_array: list[Atlas] = []
+    _atlas_loc: dict[Atlas] = {}
+    _occupated_textures: dict[str] = {}
+
+    @classmethod
+    def new_atlas(cls) -> None:
+        atlas = Atlas(cls._atlas_size, cls._atlas_size, uuid.uuid4().hex)
+        location = cls.create_texture(atlas.image, ConvertType.IMAGE, atlas.occupation)
+        atlas.tex_id = location.tex_id
+        cls._atlas_array.append(atlas)
+        cls._atlas_loc[location.tex_id] = atlas
+
+    @classmethod
+    def get_current_atlas(cls, width: int, height: int) -> Sequence[Atlas | Rec]:
+        for atlas in cls._atlas_array:
+            rect = atlas.insert(width, height)
+            if not rect == None:
+                return atlas, rect
+
+        cls.new_atlas()
+        atlas = cls._atlas_array[-1]
+        rect = atlas.insert(width, height)
+
+        return atlas, rect
+
+    @classmethod
+    def get_atlas(cls, tex_id: int) -> Atlas:
+        return cls._atlas_loc[tex_id]
+
+    @classmethod
+    def texture_to_bytes(cls, texture: Draw, convert_type: ConvertType) -> Draw:
+        if convert_type == ConvertType.VIDEO:
+            return cls._video_to_bytes(texture)
+        elif convert_type == ConvertType.GIF:
+            return cls._gif_to_bytes(texture)
+        elif convert_type == ConvertType.IMAGE:
+            return cls._image_to_bytes(texture)
+
+    @staticmethod
+    def _image_to_bytes(texture: Draw) -> Draw:
+        texture = texture.convert("RGBA")
+        width, height = texture.size
+        texture = texture.tobytes()
+        return texture, width, height, GL_RGBA
+    
+    @staticmethod
+    def _gif_to_bytes(texture: Draw) -> Draw:
+        height, width = texture.shape[:2]
+
+        if texture.shape[2] == 3:
+            image_format = GL_RGB
+        else:
+            image_format = GL_RGBA
+
+        texture = np.ascontiguousarray(texture)
+
+        return texture, width, height, image_format
+
+    @staticmethod
+    def _video_to_bytes(texture: Draw) -> Draw:
+        height, width = texture.shape[:2]
+        texture = np.ascontiguousarray(texture)
+        return texture, width, height, GL_BGR
+
+    @classmethod
+    def create_texture_atlas_list(cls, frames: Sequence[Draw], convert_type: ConvertType, location: list[UVLocation]) -> UVLocation:
+        uv_list = []
+        for i, frame in enumerate(frames):
+            if len(location) == 0:
+                loc = UVLocation("", None)
+            else:
+                loc = location[i]
+                
+            uv = cls.add_texture_atlas(frame, convert_type, loc)
+            uv_list.append(uv)
+
+        return uv_list
+
+    @classmethod
+    def update_texture_atlas_list(cls, frames: Sequence[Draw], convert_type: ConvertType, location: list[UVLocation]) -> None:
+        for i, frame in enumerate(frames):
+            cls.update_texture_atlas(frame, convert_type, location[i])
+
+    @classmethod
+    def delete_texture_atlas_list(cls, location: list[UVLocation]) -> None:
+        for loc in location:
+            cls.delete_texture_atlas(loc)
+
+    @classmethod
+    def create_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
+        image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
+
+        if location.tex_id:
+            key = (location.uv.x, location.uv.y, location.uv.w, location.uv.h)
+            atlas = cls.get_atlas(location.tex_id)
+
+            if not atlas.used_rects.get(key) == None:
+                if not width == location.uv.w or not height == location.uv.h:
+                    raise ValueError("Tamanhos não batem")
+                cls.update_texture_atlas(texture, convert_type, location)
+                return location
+
+        current_atlas, rect = cls.get_current_atlas(width, height)
+
+        glBindTexture(GL_TEXTURE_2D, current_atlas.tex_id)
+        glTexSubImage2D(
+            GL_TEXTURE_2D,
+            0,
+            rect.x, rect.y,
+            rect.w, rect.h,
+            image_format,
+            GL_UNSIGNED_BYTE,
+            image
+        )
+        return UVLocation(current_atlas.tex_id, rect)
+
+    @classmethod
+    def update_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
+        image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
+        glBindTexture(GL_TEXTURE_2D, location.tex_id)
+        glTexSubImage2D(
+            GL_TEXTURE_2D,
+            0,
+            location.uv.x, location.uv.y,
+            location.uv.w, location.uv.h,
+            image_format,
+            GL_UNSIGNED_BYTE,
+            image
+        )
+
+    @classmethod
+    def delete_texture_atlas(cls, location: UVLocation) -> None:
+        key = (location.uv.x, location.uv.y, location.uv.w, location.uv.h)
+
+        atlas = cls.get_atlas_id(location.tex_id)
+        if not atlas.used_rects.get(key) == None:
+            atlas.remove(location.uv)
+
+            if len(atlas.used_rects) == 0 and len(cls._atlas_array) >= 2:
+                ShaderHandler.delete_texture(atlas.occupation)
+                del cls._atlas_loc[atlas.tex_id]
+                cls._atlas_array.remove(atlas)
+
+    @classmethod
+    def create_texture(cls, texture: Draw, convert_type: ConvertType, occupation: str=None) -> tuple:
+        if occupation == None:
+            occupation = uuid.uuid4().hex
+            
+        if not cls._occupated_textures.get(occupation) == None:
+            tex_id = cls._occupated_textures[occupation]
+            width, height = cls.update_texture(tex_id, texture, convert_type)
+
+            return UVLocation(tex_id, Rec(x=0, y=0, w=width, h=height))
+            
+        image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
+        tex_id = glGenTextures(1)
+
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            width,
+            height,
+            0,
+            image_format,
+            GL_UNSIGNED_BYTE,
+            image)
+
+        cls._occupated_textures[occupation] = tex_id
+        return UVLocation(tex_id, uv=Rec(x=0, y=0, w=width, h=height))
+    
+    @classmethod
+    def update_texture(cls, tex_id: int, texture: Draw, convert_type: ConvertType) -> int:
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            width, height,
+            0,
+            image_format,
+            GL_UNSIGNED_BYTE,
+            image
+        )
+
+        return width, height
+    
+    @classmethod
+    def delete_texture(cls, occupation: str) -> None:
+        glDeleteTextures([cls._occupated_textures[occupation]])
+        cls._occupated_textures.pop(occupation)
+
+    @classmethod
+    def get_texture_id(cls, occupation: str) -> int:
+        return cls._occupated_textures[occupation]
+    
+class Shader:
+    def __init__(self, vertex, fragment):
+        self._raw_vertex = vertex
+        self._raw_fragment = fragment
+
+    def set_vbo(self, vbo):
+        self._vbo = vbo
+
+    def set_ssbo(self, ssbo):
+        self._ssbo = ssbo
+
+    def set_ebo(self, ebo):
+        self._ebo = ebo
+
+    def set_vao(self, vao):
+        self._vao = vao
+
+    def set_uniforms(self, uniforms):
+        self._uniforms = uniforms
+
+    def set_program(self, program):
+        self._program = program
+
+class ShaderManager:
     _uniform_mappings: dict[Callable] = {
         "1i": glUniform1i,
         "2i": glUniform2i,
@@ -192,84 +416,43 @@ class ShaderHandler:
         "3fv": glUniform3fv,
         "4fv": glUniform4fv
     }
-    _atlas_array: list[Atlas] = []
-    _atlas_loc: dict[Atlas] = {}
-    _atlas_size = 1024
+    current_program: str = None
+
     _render_list: list = []
-
-    _CWD = Path.cwd()
-    _SHADERS = _CWD / "app" / "shaders"
-
-    @staticmethod
-    def ortho(left, right, bottom, top, near=-1, far=1):
-        return np.array([
-            [2/(right-left), 0, 0, -(right+left)/(right-left)],
-            [0, 2/(top-bottom), 0, -(top+bottom)/(top-bottom)],
-            [0, 0, -2/(far-near), -(far+near)/(far-near)],
-            [0, 0, 0, 1]
-        ], dtype=np.float32)
-
-    @classmethod
-    def new_atlas(cls) -> None:
-        atlas = Atlas(cls._atlas_size, cls._atlas_size, uuid.uuid4().hex)
-        location = cls.add_texture(atlas.image, ConvertType.IMAGE, atlas.occupation)
-        atlas.tex_id = location.tex_id
-        cls._atlas_array.append(atlas)
-        cls._atlas_loc[location.tex_id] = atlas
-
-    @classmethod
-    def get_uniform_func(cls, data_type: str) -> Callable:
-        return cls._uniform_mappings[data_type]
-
-    @classmethod
-    def set_size(cls, size: tuple) -> None:
-        cls.screen_size = size
-
-    @classmethod
-    def get_size(cls) -> tuple:
-        return cls.screen_size
+    _shaders: dict[Shader] = {}
     
     @classmethod
-    def generate_shader_programs(cls) -> None:
-        cls.new_atlas()
-        files: dict[str, str] = cls.get_shader_files()
-        for key in files:
-            vertex: str
-            fragment: str
-            vertex, fragment = files[key].vertex, files[key].fragment
-            cls._shader_files[key].program = cls.create_shader_program(vertex, fragment)
-            vao, vbo, ssbo, stride = cls.create_vao(cls._shader_files[key].layout)
-            cls._shader_files[key].vao = vao
-            cls._shader_files[key].vbo = vbo
-            cls._shader_files[key].ssbo = ssbo
-            cls._shader_files[key].stride_size = stride
+    def _get_uniform_function(cls, data_type: str) -> Callable:
+        return cls._uniform_mappings[data_type]
+    
+    @classmethod
+    def build_shaders(cls) -> None:
+        for shader in cls._shaders.values():
+            vertex, fragment = shader.full_vertex(), shader.full_fragment()
+            shader.set_program(cls.compile_shader(vertex, fragment))
+
+            vao, vao_stride = cls.build_vao(shader.layout)
+            vbo = cls.build_vbo(shader.layout)
+            ssbo = cls.build_ssbo(shader.layout)
+            shader.set_vao(vao, vao_stride)
+            shader.set_vbo(vbo)
+            shader.set_ssbo(ssbo)
 
     @classmethod
-    def get_shader_files(cls) -> dict[str, str]:
-        return cls._shader_files
+    def get_shader(cls, name: str) -> Shader:
+        return cls._shaders[name]
 
     @classmethod
-    def get_shader_file(cls, name: str) -> dict[str, str]:
-        return cls._shader_files[name]
-
-    @classmethod
-    def get_shader_program(cls, name: str) -> Callable:
-        return cls._shader_files[name].program
-
-    @classmethod
-    def set_default_file_path(cls, path: str) -> None:
-        cls._SHADERS = path
-
-    @classmethod
-    def add_shader_file(cls, name: str, layout: dict) -> None:
-        with open(cls._SHADERS / (name + ".vsh"), "r") as file:
+    def add_shader(cls, name, path_vertex, path_fragment) -> None:
+        with open(path_vertex, "r") as file:
             VERTEX_SHADER = file.read()
-        with open(cls._SHADERS / (name + ".fsh"), "r") as file:
+        with open(path_fragment, "r") as file:
             FRAGMENT_SHADER = file.read()
-        cls._shader_files[name] = ShaderData(layout=layout, vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER)
+
+        cls._shaders[name] = Shader(vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER)
 
     @staticmethod
-    def create_shader_program(vertex: str, fragment: str) -> Callable:
+    def compile_shader(vertex: str, fragment: str) -> Callable:
         shader = compileProgram(
             compileShader(vertex, GL_VERTEX_SHADER),
             compileShader(fragment, GL_FRAGMENT_SHADER),
@@ -278,27 +461,27 @@ class ShaderHandler:
         return shader
 
     @classmethod
-    def init_pygame_opengl(cls, flags: int, color: tuple) -> None:
-        display = cls.screen_size
-
+    def init_opengl(cls, size: tuple, flags: int, title: str, color: tuple=(0, 0, 0, 255)) -> None:
         pg.display.gl_set_attribute(pg.GL_MULTISAMPLEBUFFERS, 0)
         pg.display.gl_set_attribute(pg.GL_MULTISAMPLESAMPLES, 0)
 
         pg.display.gl_set_attribute(pg.GL_ALPHA_SIZE, 8)
-        pg.display.set_mode(display, flags)
-        pg.display.set_caption("test")
+        pg.display.set_mode(size, flags)
+        pg.display.set_caption(title)
 
-        glViewport(0, 0, display[0], display[1])
+        width, height = size
+        glViewport(0, 0, width, height)
         glDisable(GL_MULTISAMPLE)
         
-        glClearColor(*map(lambda x: x / 255, color))
+        r, g, b, a = color
+        glClearColor(r / 255, g / 255, b / 255, a / 255)
 
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
     @staticmethod
-    def create_vao(layout: dict) -> object:
+    def build_vao(layout: dict) -> object:
         vertices = np.array([
             -0.5, -0.5, 0.0,   1, 1, 1,    0, 0,
              0.5, -0.5, 0.0,   1, 1, 1,    1, 0,
@@ -313,7 +496,7 @@ class ShaderHandler:
 
         vao = glGenVertexArrays(1)
         vbo = glGenBuffers(1)
-        instance_vbo = glGenBuffers(1)
+        vbo = glGenBuffers(1)
         ebo = glGenBuffers(1)
         ssbo = None
 
@@ -352,7 +535,7 @@ class ShaderHandler:
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(24))
         glEnableVertexAttribArray(2)
 
-        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
         stride = sum(size for _, size in layout["vao"]) * 4
         offset = 0
 
@@ -368,285 +551,28 @@ class ShaderHandler:
 
         glBindVertexArray(0)
 
-        return vao, instance_vbo, ssbo, stride // 4
+        return vao, vbo, ssbo, stride // 4, ebo
 
     @classmethod
-    def setup_textured_quad(cls) -> list[int, int]:
-        vertices = np.array([
-            -0.5, -0.5, 0.0,   1, 1, 1,    0, 0,
-             0.5, -0.5, 0.0,   1, 1, 1,    1, 0,
-             0.5,  0.5, 0.0,   1, 1, 1,    1, 1,
-            -0.5,  0.5, 0.0,   1, 1, 1,    0, 1,
-        ], dtype=np.float32)
-
-        indices = np.array([
-            0, 1, 2,
-            2, 3, 0
-        ], dtype=np.uint32)
-
-        instance_vbo = glGenBuffers(1)
-        VAO = glGenVertexArrays(1)
-        VBO = glGenBuffers(1)
-        EBO = glGenBuffers(1)
-
-        glBindVertexArray(VAO)
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBO)
-        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
-
-        stride = 8 * vertices.itemsize
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(12))
-        glEnableVertexAttribArray(1)
-
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(24))
-        glEnableVertexAttribArray(2)
-
-        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
-
-        MAX_SPRITES = 50000
-        FLOATS_PER_INSTANCE = 10
-        glBufferData(GL_ARRAY_BUFFER, MAX_SPRITES * FLOATS_PER_INSTANCE * 4, None, GL_DYNAMIC_DRAW)
-
-        stride = 10 * 4
-
-        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(3)
-        glVertexAttribDivisor(3, 1)
-
-        glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(2 * 4))
-        glEnableVertexAttribArray(4)
-        glVertexAttribDivisor(4, 1)
-
-        glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(4 * 4))
-        glEnableVertexAttribArray(5)
-        glVertexAttribDivisor(5, 1)
-
-        glVertexAttribPointer(6, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(6 * 4))
-        glEnableVertexAttribArray(6)
-        glVertexAttribDivisor(6, 1)
-
-        glVertexAttribPointer(7, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(8 * 4))
-        glEnableVertexAttribArray(7)
-        glVertexAttribDivisor(7, 1)
-
-    @classmethod
-    def set_shader(cls, shader: str) -> None:
-        shader_program = cls.get_shader_program(shader)
-        glUseProgram(shader_program)
-        cls._current_program = shader_program
-        cls.u_mvp_loc = glGetUniformLocation(shader_program, "u_mvp")
-
-        shader_file = cls.get_shader_file(shader)
-        cls.instance_vbo = shader_file.vbo
-        cls.vao = shader_file.vao
-        cls.ssbo = shader_file.ssbo
-        cls.stride_size = shader_file.stride_size
+    def set_shader(cls, name: str) -> None:
+        shader = cls.get_shader(name)
+        glUseProgram(shader.program)
+        cls.current_program = shader
+        cls.u_mvp_loc = glGetUniformLocation(shader, "u_mvp")
         
     @classmethod
     def get_current_shader(cls) -> Callable:
-        return cls._current_program
+        return cls.current_program
 
     @classmethod
     def set_uniform_value(cls, uniform: str, data_type: str, *value: list) -> None:
         u = glGetUniformLocation(cls.get_current_shader(), uniform)
-        func = cls.get_uniform_func(data_type)
+        func = cls._get_uniform_function(data_type)
         value = list(value)
         params = [u] + value
         func(*params)
 
-    @classmethod
-    def byte_texture(cls, texture: Draw, convert_type: ConvertType) -> Draw:
-        if convert_type == ConvertType.VIDEO:
-            return cls.byte_texture_vid(texture)
-        elif convert_type == ConvertType.GIF:
-            return cls.byte_texture_gif(texture)
-        elif convert_type == ConvertType.IMAGE:
-            return cls.byte_texture_img(texture)
-
-    @staticmethod
-    def byte_texture_img(texture: Draw) -> Draw:
-        texture = texture.convert("RGBA")
-        width, height = texture.size
-        texture = texture.tobytes()
-        return texture, width, height, GL_RGBA
-    
-    @staticmethod
-    def byte_texture_gif(texture: Draw) -> Draw:
-        height, width = texture.shape[:2]
-
-        if texture.shape[2] == 3:
-            image_format = GL_RGB
-        else:
-            image_format = GL_RGBA
-
-        texture = np.ascontiguousarray(texture)
-
-        return texture, width, height, image_format
-
-    @staticmethod
-    def byte_texture_vid(texture: Draw) -> Draw:
-        height, width = texture.shape[:2]
-        texture = np.ascontiguousarray(texture)
-        return texture, width, height, GL_BGR
-
-    @classmethod
-    def get_tex_id(cls, occupation: str) -> int:
-        return cls._occupated_textures[occupation]
-
-    @classmethod
-    def current_atlas(cls, width: int, height: int) -> Sequence[Atlas | Rec]:
-        for atlas in cls._atlas_array:
-            rect = atlas.insert(width, height)
-            if not rect == None:
-                return atlas, rect
-
-        cls.new_atlas()
-        atlas = cls._atlas_array[-1]
-        rect = atlas.insert(width, height)
-
-        return atlas, rect
-
-    @classmethod
-    def get_tex_id_atlas(cls, tex_id: int) -> Atlas:
-        return cls._atlas_loc[tex_id]
-
-    @classmethod
-    def add_texture_atlas_list(cls, frames: Sequence[Draw], convert_type: ConvertType, location: list[UVLocation]) -> UVLocation:
-        uv_list = []
-        for i, frame in enumerate(frames):
-            if len(location) == 0:
-                loc = UVLocation("", None)
-            else:
-                loc = location[i]
-                
-            uv = cls.add_texture_atlas(frame, convert_type, loc)
-            uv_list.append(uv)
-
-        return uv_list
-
-    @classmethod
-    def remove_texture_atlas_list(cls, location: list[UVLocation]) -> None:
-        for loc in location:
-            cls.remove_texture_atlas(loc)
-
-    @classmethod
-    def add_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
-        image, width, height, image_format = cls.byte_texture(texture, convert_type)
-
-        if location.tex_id:
-            key = (location.uv.x, location.uv.y, location.uv.w, location.uv.h)
-            atlas = cls.get_tex_id_atlas(location.tex_id)
-
-            if not atlas.used_rects.get(key) == None:
-                if not width == location.uv.w or not height == location.uv.h:
-                    raise ValueError("Tamanhos não batem")
-                cls.replace_texture_atlas(texture, convert_type, location)
-                return location
-
-        current_atlas, rect = cls.current_atlas(width, height)
-
-        glBindTexture(GL_TEXTURE_2D, current_atlas.tex_id)
-        glTexSubImage2D(
-            GL_TEXTURE_2D,
-            0,
-            rect.x, rect.y,
-            rect.w, rect.h,
-            image_format,
-            GL_UNSIGNED_BYTE,
-            image
-        )
-        return UVLocation(current_atlas.tex_id, rect)
-
-    @classmethod
-    def replace_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
-        image, width, height, image_format = cls.byte_texture(texture, convert_type)
-        glBindTexture(GL_TEXTURE_2D, location.tex_id)
-        glTexSubImage2D(
-            GL_TEXTURE_2D,
-            0,
-            location.uv.x, location.uv.y,
-            location.uv.w, location.uv.h,
-            image_format,
-            GL_UNSIGNED_BYTE,
-            image
-        )
-
-    @classmethod
-    def remove_texture_atlas(cls, location: UVLocation) -> None:
-        key = (location.uv.x, location.uv.y, location.uv.w, location.uv.h)
-
-        atlas = cls.get_tex_id_atlas(location.tex_id)
-        if not atlas.used_rects.get(key) == None:
-            atlas.remove(location.uv)
-
-            if len(atlas.used_rects) == 0 and len(cls._atlas_array) >= 2:
-                ShaderHandler.remove_texture(atlas.occupation)
-                del cls._atlas_loc[atlas.tex_id]
-                cls._atlas_array.remove(atlas)
-
-    @classmethod
-    def add_texture(cls, texture: Draw, convert_type: ConvertType, occupation: str=None) -> tuple:
-        if occupation == None:
-            occupation = uuid.uuid4().hex
-            
-        if not cls._occupated_textures.get(occupation) == None:
-            tex_id = cls._occupated_textures[occupation]
-            width, height = cls.replace_texture(tex_id, texture, convert_type)
-
-            return UVLocation(tex_id, Rec(x=0, y=0, w=width, h=height))
-            
-        image, width, height, image_format = cls.byte_texture(texture, convert_type)
-        tex_id = glGenTextures(1)
-
-        glBindTexture(GL_TEXTURE_2D, tex_id)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            width,
-            height,
-            0,
-            image_format,
-            GL_UNSIGNED_BYTE,
-            image)
-
-        cls._occupated_textures[occupation] = tex_id
-        return UVLocation(tex_id, uv=Rec(x=0, y=0, w=width, h=height))
-    
-    @classmethod
-    def replace_texture(cls, tex_id: int, texture: Draw, convert_type: ConvertType) -> int:
-        glBindTexture(GL_TEXTURE_2D, tex_id)
-        image, width, height, image_format = cls.byte_texture(texture, convert_type)
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            width, height,
-            0,
-            image_format,
-            GL_UNSIGNED_BYTE,
-            image
-        )
-
-        return width, height
-    
-    @classmethod
-    def remove_texture(cls, occupation: str) -> None:
-        glDeleteTextures([cls._occupated_textures[occupation]])
-        cls._occupated_textures.pop(occupation)
-    
+class ShaderRender:
     @staticmethod
     def build_view(cam_pos, cam_angle, cam_scale, pivot) -> np.array:
         c = np.cos(radians(cam_angle))
@@ -708,17 +634,17 @@ class ShaderHandler:
 
     @classmethod
     def render_all(cls) -> None:
-        mvp = cls.ortho(0, cls.screen_size[0], cls.screen_size[1], 0)
-        mvp3d = glm.perspective(
+        # perspective = glm.ortho(0, cls.screen_size[0], cls.screen_size[1], 0, -100, 100)
+        perspective = glm.perspective(
             glm.radians(70.0),
             cls.screen_size[1] / cls.screen_size[0],
             0.1,
             1000.0
         )
-        view3d = glm.lookAt(
-            glm.vec3(0, 0, 5),  # camera position
-            glm.vec3(0, 0, 0),  # target
-            glm.vec3(0, 1, 0)   # up vector
+        view = glm.lookAt(
+            glm.vec3(0, 0, 5),
+            glm.vec3(0, 0, 0),
+            glm.vec3(0, 1, 0)
         )
         cam = Camera.get_main_camera()
         cam_pos = cam.get_pos()

@@ -51,17 +51,6 @@ class UVLocation:
     uv: Rec = None
 
 @dataclass
-class ShaderData:
-    layout: dict
-    vertex: str
-    fragment: str
-    program: object = None
-    vbo: int = None
-    vao: int = None
-    ssbo: int = None
-    stride_size: int = 0
-
-@dataclass
 class CollisionData:
     mtv: int
     normal: Vector

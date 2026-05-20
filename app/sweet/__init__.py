@@ -11,7 +11,7 @@ from . import (
 )
 
 def init():
-    looping.GameLoop.setup()
+    looping.GameLoop.init()
 
 def start():
     looping.GameLoop.start()

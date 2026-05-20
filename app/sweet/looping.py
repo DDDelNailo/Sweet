@@ -63,10 +63,6 @@ class GameLoop:
     @classmethod
     def get_resizable(cls) -> bool:
         return cls._resizable
-    
-    @classmethod
-    def get_flags(cls) -> int:
-        return cls._flags
 
     @classmethod
     def set_title(cls, title: str) -> None:
@@ -107,11 +103,9 @@ class GameLoop:
         return cls._screen_size
     
     @classmethod
-    def setup(cls) -> None:
-        Texture.set_texture("pixel", Path.cwd() / "app" / "sources" / "build" / "pixel.png")
-        ShaderHandler.set_size(cls.get_screen_size())
-        ShaderHandler.init_pygame_opengl(cls.get_flags(), cls._color)
-        ShaderHandler.generate_shader_programs()
+    def init(cls) -> None:
+        ShaderHandler.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
+        ShaderHandler.build_shaders()
         cls._built = True
 
     @classmethod
@@ -129,8 +123,9 @@ class GameLoop:
 
             glClear(GL_COLOR_BUFFER_BIT)
 
-            ShaderHandler.set_shader("def")
-            ShaderHandler.set_uniform_value("u_texture", "1i", 0)
+            if not ShaderHandler.current_program == "def":
+                ShaderHandler.set_shader("def")
+                ShaderHandler.set_uniform_value("u_texture", "1i", 0)
 
             if cls.debug:
                 Testing.cummulation_start()
