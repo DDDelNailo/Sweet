@@ -1,6 +1,6 @@
 from PIL import Image, ImageEnhance
 import uuid
-from .shaders import ShaderHandler
+from .shaders import ShaderManager, ShaderTexture
 from ..common import *
 from pathlib import Path
 import cv2
@@ -8,7 +8,7 @@ import imageio
 from OpenGL.GL import *
 
 class Texture:
-    _atlas_size = ShaderHandler._atlas_size
+    _atlas_size = ShaderTexture._atlas_size
     _textures: dict["Imaging"] = {}
     
     @classmethod
@@ -124,9 +124,9 @@ class Video:
             raise ValueError("Sem ocupação definida")
         
         if self.file_type in [FileType.STREAM, FileType.DYNAMIC]:
-            self.uv = ShaderHandler.add_texture(self.get_image(), self.convert_type, self.occupation)
+            self.uv = ShaderManager.add_texture(self.get_image(), self.convert_type, self.occupation)
         elif self.file_type == FileType.BATCHLIST:
-            self.uv_list = ShaderHandler.add_texture_atlas_list(self.get_frames(), self.convert_type, self.uv_list)
+            self.uv_list = ShaderManager.add_texture_atlas_list(self.get_frames(), self.convert_type, self.uv_list)
             self.uv = self.uv_list[0]
         else:
             raise TypeError
@@ -147,7 +147,7 @@ class Video:
                 ret, self.image = self.cap.read()
 
         if self.file_type in [FileType.STREAM, FileType.DYNAMIC]:
-            self.uv = ShaderHandler.add_texture(self.get_image(), self.convert_type, self.occupation)
+            self.uv = ShaderManager.add_texture(self.get_image(), self.convert_type, self.occupation)
         elif self.file_type == FileType.BATCHLIST:
             self.uv = self.uv_list[self._current_frame]
 
@@ -197,9 +197,9 @@ class Imaging:
         if self.occupation == None:
             raise ValueError("Sem ocupação definida")
         if self.file_type in [FileType.DYNAMIC, FileType.BACKGROUND]:
-            self.uv = ShaderHandler.add_texture(self.get_image(), ConvertType.IMAGE, self.occupation)
+            self.uv = ShaderManager.add_texture(self.get_image(), ConvertType.IMAGE, self.occupation)
         elif self.file_type == FileType.BATCH:
-            self.uv = ShaderHandler.add_texture_atlas(self.get_image(), ConvertType.IMAGE, self.uv)
+            self.uv = ShaderManager.add_texture_atlas(self.get_image(), ConvertType.IMAGE, self.uv)
         else:
             raise TypeError
 

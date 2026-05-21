@@ -1,4 +1,4 @@
-from .graphics.shaders import ShaderHandler
+from .graphics.shaders import ShaderManager, ShaderRender
 from .graphics.texture import Texture, Imaging, Video
 from .camera import Camera, Cam
 from OpenGL.GL import *
@@ -6,68 +6,10 @@ import pygame as pg
 from .common import TextureData, Sprite, Sprite3D
 from typing import Sequence
 from .linalg.vector import Vec
-import numpy as np
 from PIL import Image
-from dataclasses import dataclass
+from pathlib import Path
 
-class EntityTools:
-    ShaderHandler.add_shader_file("def", layout = {
-        "vao": [("iPos", 2),
-        ("iScale", 2),
-        ("iRot", 2),
-        ("iUVOff", 2),
-        ("iUVScale", 2),
-        ("iRgb", 3),
-        ("iAlpha", 1)]
-    })
-    _font: pg.font = None
-    _z = 0
-
-    @staticmethod
-    def get_default_shader_layout():
-        return {"vao": [("iPos", 2),
-        ("iScale", 2),
-        ("iRot", 2),
-        ("iUVOff", 2),
-        ("iUVScale", 2),
-        ("iRgb", 3),
-        ("iAlpha", 1)]
-    }
-
-    @staticmethod
-    def get_default_3d_shader_layout():
-        return {"vao": [("iPos", 3),
-        ("iScale", 3),
-        ("iRot", 3),
-        ("iOffset", 2),
-        ("iUVOff", 2),
-        ("iUVScale", 2),
-        ("iView", 2),
-        ("iRgb", 3),
-        ("iAlpha", 1),
-        ]
-    }
-
-    @staticmethod
-    def get_cam(cam: str) -> Cam:
-        return Camera.get_camera(cam)
-
-    @classmethod
-    def get_default_shaders(cls) -> dict[str, str]:
-        return ShaderHandler.get_shader_program("def")
-
-    @staticmethod
-    def get_screen_size() -> tuple:
-        return ShaderHandler.get_size()
-
-    @staticmethod
-    def tex(tex) -> TextureData:
-        return Texture.get_texture(tex)
-
-    @staticmethod
-    def default_draw(entity) -> None:
-        ShaderHandler.render(entity.get_mvp(), Texture.get_texture(entity.image))
-
+class Draw:
     @classmethod
     def draw_image(cls,
                    image: Imaging | Video,
@@ -87,7 +29,7 @@ class EntityTools:
         overhead.extend(overhead_data)
         sprite = Sprite(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
         cls._z += 1
-        ShaderHandler.render_add(sprite)
+        ShaderRender.add_draw_call(sprite)
 
     @classmethod
     def draw_image_3d(cls,
@@ -108,7 +50,7 @@ class EntityTools:
         overhead.extend(overhead_data)
         sprite = Sprite3D(pos, scale, angle, offset, image.uv.uv, image.get_tex_id(), program, unit, overhead)
         cls._z += 1
-        ShaderHandler.render_add(sprite)
+        ShaderRender.add_draw_call(sprite)
 
     @classmethod
     def set_font(cls, font: pg.font) -> None:
@@ -151,6 +93,58 @@ class EntityTools:
                        static=static,
                        program=program,
                        unit=unit)
+
+class EntityTools:
+    CWD = Path.cwd()
+    SHADERS = CWD / "src" / "shaders"
+    ShaderManager.add_shader("def", SHADERS / "def.vsh", SHADERS / "def.fsh")
+    _font: pg.font = None
+    _z = 0
+
+    @staticmethod
+    def get_default_shader_layout():
+        return {"vao": [("iPos", 2),
+        ("iScale", 2),
+        ("iRot", 2),
+        ("iUVOff", 2),
+        ("iUVScale", 2),
+        ("iRgb", 3),
+        ("iAlpha", 1)]
+    }
+
+    @staticmethod
+    def get_default_3d_shader_layout():
+        return {"vao": [("iPos", 3),
+        ("iScale", 3),
+        ("iRot", 3),
+        ("iOffset", 2),
+        ("iUVOff", 2),
+        ("iUVScale", 2),
+        ("iView", 2),
+        ("iRgb", 3),
+        ("iAlpha", 1),
+        ]
+    }
+
+    @staticmethod
+    def get_cam(cam: str) -> Cam:
+        return Camera.get_camera(cam)
+
+    @classmethod
+    def get_default_shaders(cls) -> dict[str, str]:
+        return ShaderManager.get_shader_program("def")
+
+    @staticmethod
+    def get_screen_size() -> tuple:
+        return ShaderManager.get_size()
+
+    @staticmethod
+    def tex(tex) -> TextureData:
+        return Texture.get_texture(tex)
+
+    @staticmethod
+    def default_draw(entity) -> None:
+        ShaderManager.render(entity.get_mvp(), Texture.get_texture(entity.image))
 
 class Entity:
     def __init__(self,

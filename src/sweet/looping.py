@@ -2,7 +2,7 @@ import pygame as pg
 from .common import Draw
 from pygame.locals import *
 import os
-from .graphics.shaders import ShaderHandler
+from .graphics.shaders import ShaderManager, ShaderRender
 from .graphics.texture import Texture
 from OpenGL.GL import *
 from .entity import EntityManager, EntityTools
@@ -96,7 +96,7 @@ class GameLoop:
             cls._screen_size = size
         if size == (cls.view_width, cls.view_height):
             cls.set_fullscreen(True)
-        ShaderHandler.set_size(size)
+        ShaderManager.set_size(size)
 
     @classmethod
     def get_screen_size(cls) -> tuple:
@@ -104,8 +104,8 @@ class GameLoop:
     
     @classmethod
     def init(cls) -> None:
-        ShaderHandler.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
-        ShaderHandler.build_shaders()
+        ShaderManager.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
+        ShaderManager.build_shaders()
         cls._built = True
 
     @classmethod
@@ -120,55 +120,6 @@ class GameLoop:
 
         while cls._running:
             Input.update()
-
-            glClear(GL_COLOR_BUFFER_BIT)
-
-            if not ShaderHandler.current_program == "def":
-                ShaderHandler.set_shader("def")
-                ShaderHandler.set_uniform_value("u_texture", "1i", 0)
-
-            if cls.debug:
-                Testing.cummulation_start()
-
-            entities: dict
-            entities = EntityManager.get_tick_entities(0)
-            for entity in entities:
-                entities[entity].pre_tick()
-            entities = EntityManager.get_tick_entities(1)
-            for entity in entities:
-                entities[entity].tick()
-            entities = EntityManager.get_tick_entities(2)
-            for entity in entities:
-                entities[entity].pos_tick()
-                
-            entities = EntityManager.get_all_entities()
-            content_orders: list = EntityManager.get_content_orders()
-            for order in content_orders:
-                content_layers: list = EntityManager.get_content_layers(order)
-                for layer in content_layers:
-                    for entity in entities[order][layer]:
-                        entity.draw()
-
-            ShaderHandler.render_all()
-            EntityTools._z = 0
-                        
-            order_changes: list = EntityManager.get_order_changes()
-            for key in order_changes:
-                EntityManager.set_order_change(*order_changes[key])
-
-            layer_changes: list = EntityManager.get_layer_changes()
-            for key in layer_changes:
-                EntityManager.set_layer_change(*layer_changes[key])
-
-            entity_changes: list = EntityManager.get_entity_changes()
-            for key in entity_changes:
-                EntityManager.create_entity(*entity_changes[key])
-
-            destroy_changes: list = EntityManager.get_destroy_changes()
-            for key in destroy_changes:
-                EntityManager.destroy_entity(entity_changes[key])
-
-            EntityManager.clear_agend()
 
             Input.mouse_scroll_x = 0
             Input.mouse_scroll_y = 0
@@ -211,6 +162,50 @@ class GameLoop:
                             screen_value = (cls.view_width, cls.view_height)
                             pg.display.set_mode(screen_value, pg.FULLSCREEN | cls.get_flags())
                             cls.update_screen_size(screen_value)
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+            if not ShaderManager.get_current_shader() == "def":
+                ShaderManager.set_shader("def")
+                ShaderManager.set_uniform_value("u_texture", "1i", 0)
+                shader = ShaderManager.get_current_shader()
+
+            if cls.debug:
+                Testing.cummulation_start()
+
+            entities = EntityManager.get_tick_entities(0)
+            for entity in entities:
+                entities[entity].pre_tick()
+            entities = EntityManager.get_tick_entities(1)
+            for entity in entities:
+                entities[entity].tick()
+            entities = EntityManager.get_tick_entities(2)
+            for entity in entities:
+                entities[entity].pos_tick()
+                
+            entities = EntityManager.get_all_entities()
+            for entity in entities:
+                entity.draw()
+
+            ShaderRender.render()
+                        
+            order_changes: list = EntityManager.get_order_changes()
+            for key in order_changes:
+                EntityManager.set_order_change(*order_changes[key])
+
+            layer_changes: list = EntityManager.get_layer_changes()
+            for key in layer_changes:
+                EntityManager.set_layer_change(*layer_changes[key])
+
+            entity_changes: list = EntityManager.get_entity_changes()
+            for key in entity_changes:
+                EntityManager.create_entity(*entity_changes[key])
+
+            destroy_changes: list = EntityManager.get_destroy_changes()
+            for key in destroy_changes:
+                EntityManager.destroy_entity(entity_changes[key])
+
+            EntityManager.clear_agend()
 
             if cls.debug:
                 Testing.cummulation_end()

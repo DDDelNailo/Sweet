@@ -6,13 +6,15 @@ from pathlib import Path
 from pygame.locals import *
 from math import pi
 
-SOURCE = Path.cwd() / "app" / "sources"
+SOURCE = Path.cwd() / "src" / "sources"
 sw.looping.GameLoop.set_screen_size((sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height))
 main_cam = sw.camera.Camera.get_main_camera()
 view_size = Vec(480, 270)
 cam_factor = (view_size.y / sw.looping.GameLoop.view_height)
 main_cam.set_scale((cam_factor, cam_factor))
+
 sw.looping.GameLoop.set_background_color((255, 230, 147, 1))
+
 ShaderHandler.add_shader_file("floor", {"vao": [
     ("iPos", 2),
     ("iScale", 2),

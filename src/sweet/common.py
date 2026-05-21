@@ -65,7 +65,7 @@ class Sprite:
     layer: int
     rotation: float
     uv: tuple
-    tex_id: int
+    texture_id: int
     static: bool
     program: bool
     unit: int
@@ -78,7 +78,7 @@ class Sprite3D:
     rotation: tuple
     offset: tuple
     uv: tuple
-    tex_id: int
+    texture_id: int
     program: bool
     unit: int
     overhead: list
