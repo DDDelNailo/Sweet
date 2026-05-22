@@ -1,25 +1,26 @@
-from sweet.graphics.texture import Imaging
+from sweet.graphics.__texture import Imaging
 
 from . import (
+    __camera,
+    __common,
+    __entity,
+    __inputting,
+    __looping,
+    __testing,
     graphics,
     linalg,
-    camera,
     network,
-    inputting,
-    looping,
-    testing,
-    entity,
-    common,
 )
 
 def init():
-    looping.GameLoop.init()
+    __looping.GameLoop.init()
 
 def run():
-    looping.GameLoop.start()
+    __looping.GameLoop.start()
 
-class Entity(entity.Entity):
+class Entity(__entity.Entity):
     def __init__(
+                self,
                 pos: tuple,
                 image: Imaging = None,
                 scale: tuple = (0, 0),
@@ -41,3 +42,22 @@ class Entity(entity.Entity):
                 tick,
                 pos_tick
         )
+    
+class Display:
+    screen_size = (__looping.GameLoop.view_width, __looping.GameLoop.view_height)
+
+    @staticmethod
+    def set_size(size):
+        __looping.GameLoop.set_screen_size(size)
+        
+    @staticmethod
+    def set_resizable(value):
+        __looping.GameLoop.set_resizable(value)
+
+class Textures:
+    @staticmethod
+    def load_json_resource(path):
+        graphics.__texture.Texture.load_json_textures(path)
+    
+
+__all__ = ["Textures", "Display"]

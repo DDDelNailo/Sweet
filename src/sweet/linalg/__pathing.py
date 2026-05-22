@@ -1,5 +1,5 @@
-from sweet.common import PathType, Interpolation, Controls
-from sweet.linalg.vector import Vec
+from sweet.__common import PathType, Interpolation, Controls
+from sweet.linalg.__vector import Vec
 from numpy import clip
 from math import comb
 from typing import Sequence

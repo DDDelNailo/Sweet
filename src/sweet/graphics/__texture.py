@@ -1,16 +1,26 @@
 from PIL import Image, ImageEnhance
 import uuid
-from .shaders import ShaderManager, ShaderTexture
-from ..common import *
+from .__shaders import ShaderManager, ShaderTexture
+from ..__common import *
 from pathlib import Path
 import cv2
 import imageio
 from OpenGL.GL import *
+import json
 
 class Texture:
     _atlas_size = ShaderTexture._atlas_size
     _textures: dict["Imaging"] = {}
     
+    @classmethod
+    def load_json_textures(cls, path: Path) -> None:
+        with open(path, "r") as file:
+            textures = json.load(file)
+        
+        for key in textures.keys():
+            path = textures[key]
+            cls.set_texture(key, path)
+
     @classmethod
     def set_texture(cls, name: str, path: Path) -> None:
         if not cls._textures.get(path) == None:

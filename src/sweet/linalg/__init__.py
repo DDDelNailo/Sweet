@@ -1,1 +1,1 @@
-from . import vector, collision, pathing
+from . import __collision, __pathing, __vector

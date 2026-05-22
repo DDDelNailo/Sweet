@@ -1,11 +1,11 @@
-from .graphics.shaders import ShaderManager, ShaderRender
-from .graphics.texture import Texture, Imaging, Video
-from .camera import Camera, Cam
+from .graphics.__shaders import ShaderManager, ShaderRender
+from .graphics.__texture import Texture, Imaging, Video
+from .__camera import Camera, Cam
 from OpenGL.GL import *
 import pygame as pg
-from .common import TextureData, Sprite, Sprite3D
+from .__common import TextureData, Sprite, Sprite3D
 from typing import Sequence
-from .linalg.vector import Vec
+from .linalg.__vector import Vec
 from PIL import Image
 from pathlib import Path
 
