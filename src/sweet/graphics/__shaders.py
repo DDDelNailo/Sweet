@@ -1,4 +1,4 @@
-from ..common import Draw, ConvertType, Rec, UVLocation, Sprite
+from ..__common import Draw, ConvertType, Rec, UVLocation, Sprite, Sprite3D
 import pygame as pg
 from pygame.locals import *
 from OpenGL.GL import *
@@ -789,12 +789,20 @@ class ShaderRender:
 
     @classmethod
     def render(cls) -> None:
-        # perspective = glm.ortho(0, cls.screen_size[0], cls.screen_size[1], 0, -100, 100)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        width = viewport[2]
+        height = viewport[3]
         perspective = glm.perspective(
             glm.radians(70.0),
-            cls.screen_size[1] / cls.screen_size[0],
+            width / height,
             0.1,
             1000.0
+        )
+        orthogonal = glm.ortho(
+            0, width,
+            height, 0,
+            -100,
+            100
         )
         view = glm.lookAt(
             glm.vec3(0, 0, 5),
@@ -802,12 +810,7 @@ class ShaderRender:
             glm.vec3(0, 1, 0)
         )
         projection = perspective
-        # cam = Camera.get_main_camera()
-        # cam_pos = cam.get_pos()
-        # cam_scale = cam.get_scale()
-        # cam_angle = cam.get_angle()
-        # view = cls.build_view(cam_pos, cam_angle, cam_scale, (cam_scale[0] * cls.screen_size[0] / 2, cam_scale[1] * cls.screen_size[1] / 2))
-        
+
         batch = []
         last_texture_id = float("-inf")
         last_unit = float("-inf")

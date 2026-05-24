@@ -1,13 +1,13 @@
 import pygame as pg
-from .common import Draw
+from .__common import Draw
 from pygame.locals import *
 import os
-from .graphics.shaders import ShaderManager, ShaderRender
-from .graphics.texture import Texture
+from .graphics.__shaders import ShaderManager, ShaderRender
+from .graphics.__texture import Texture
 from OpenGL.GL import *
-from .entity import EntityManager, EntityTools
-from .inputting import Input
-from .testing import Testing
+from .__entity import EntityManager, EntityTools
+from .__inputting import Input
+from .__testing import Testing
 from pathlib import Path
 
 class GameLoop:
@@ -96,7 +96,6 @@ class GameLoop:
             cls._screen_size = size
         if size == (cls.view_width, cls.view_height):
             cls.set_fullscreen(True)
-        ShaderManager.set_size(size)
 
     @classmethod
     def get_screen_size(cls) -> tuple:
@@ -184,8 +183,10 @@ class GameLoop:
                 entities[entity].pos_tick()
                 
             entities = EntityManager.get_all_entities()
-            for entity in entities:
-                entity.draw()
+            for order in entities.values():
+                for layer in order.values():
+                    for entity in layer:
+                        entity.draw()
 
             ShaderRender.render()
                         

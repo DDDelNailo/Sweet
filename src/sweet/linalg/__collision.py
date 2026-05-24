@@ -1,9 +1,9 @@
 from OpenGL.GL import *
 from pygame.locals import *
-from .vector import Vec
+from .__vector import Vec
 from typing import Sequence, Callable
-from ..common import Group, CollisionData
-from ..entity import EntityManager, Mask, Polygon
+from ..__common import Group, CollisionData
+from ..__entity import EntityManager, Mask, Polygon
 
 class Collision:
     @classmethod

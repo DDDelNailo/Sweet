@@ -1,19 +1,19 @@
 import sweet as sw
-from sweet.entity import *
-from sweet.inputting import *
-from sweet.graphics.texture import *
+from sweet.__entity import *
+from sweet.__inputting import *
+from sweet.graphics.__texture import *
 from pathlib import Path
 from pygame.locals import *
 from math import pi
 
 SOURCE = Path.cwd() / "src" / "sources"
-sw.looping.GameLoop.set_screen_size((sw.looping.GameLoop.view_width, sw.looping.GameLoop.view_height))
-main_cam = sw.camera.Camera.get_main_camera()
+sw.__looping.GameLoop.set_screen_size((sw.__looping.GameLoop.view_width, sw.__looping.GameLoop.view_height))
+main_cam = sw.__camera.Camera.get_main_camera()
 view_size = Vec(480, 270)
-cam_factor = (view_size.y / sw.looping.GameLoop.view_height)
+cam_factor = (view_size.y / sw.__looping.GameLoop.view_height)
 main_cam.set_scale((cam_factor, cam_factor))
 
-sw.looping.GameLoop.set_background_color((255, 230, 147, 1))
+sw.__looping.GameLoop.set_background_color((255, 230, 147, 1))
 
 ShaderHandler.add_shader_file("floor", {"vao": [
     ("iPos", 2),
@@ -56,7 +56,7 @@ class Player(Entity):
         
         vertices = [Vec(self.scale.x / 2, 0).rotate(angle * 360 / 15) for angle in range(15)]
 
-        self.mask.add_polygon("main", sw.linalg.collision.Polygon(vertices))
+        self.mask.add_polygon("main", sw.linalg.__collision.Polygon(vertices))
 
         self.jump_power = 4
         self.speed = 36 / 60
@@ -122,7 +122,7 @@ class Player(Entity):
 
                 self.velocity.y *= 0.7
 
-        sw.linalg.collision.Collision.collision_list(self, Block, apply_func=response)
+        sw.linalg.__collision.Collision.collision_list(self, Block, apply_func=response)
 
         goal_pos = self.pos - view_size / 2 + self.offset
         self.current_pos += (goal_pos - self.current_pos) / 10
@@ -138,7 +138,7 @@ class Block(Entity):
     def __init__(self, pos, size=(100, 100), angle=0):
         super().__init__(pos, image=Texture.get_texture("pixel"), scale=size, angle=angle, order=5)
         vertices = [self.scale / 2, self.scale.mirror_x() / 2, -self.scale / 2, self.scale.mirror_y() / 2]
-        self.mask.add_polygon("main", sw.linalg.collision.Polygon(vertices))
+        self.mask.add_polygon("main", sw.linalg.__collision.Polygon(vertices))
         self.mask.polygons["main"] = self.mask.get_polygon("main").rotate(self.angle)
 
     def draw(self):
