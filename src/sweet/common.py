@@ -60,25 +60,12 @@ class CollisionData:
 
 @dataclass
 class Sprite:
-    pos: tuple
-    scale: tuple
-    layer: int
-    rotation: float
-    uv: tuple
     texture_id: int
-    static: bool
-    program: bool
-    unit: int
-    overhead: list
-
-@dataclass
-class Sprite3D:
+    uv: tuple
     pos: tuple
     scale: tuple
     rotation: tuple
-    offset: tuple
-    uv: tuple
-    texture_id: int
+    color: tuple
+    static: bool
     program: bool
     unit: int
-    overhead: list

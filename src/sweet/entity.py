@@ -3,7 +3,7 @@ from .graphics.texture import Texture, Imaging, Video
 from .camera import Camera, Cam
 from OpenGL.GL import *
 import pygame as pg
-from .common import TextureData, Sprite, Sprite3D
+from .common import TextureData, Sprite
 from typing import Sequence
 from .linalg.vector import Vec
 from PIL import Image
@@ -16,19 +16,14 @@ class Draw:
                    pos: tuple,
                    scale: tuple,
                    angle: float=0,
-                   color: tuple=(255, 255, 255),
-                   alpha: float=1,
+                   color: tuple=(255, 255, 255, 255),
                    static: bool=False,
                    program: str=None,
-                   unit=GL_TEXTURE0,
-                   overhead_data=[]) -> None:
+                   unit=GL_TEXTURE0) -> None:
 
         if program == None: program = "def"
-        color = (color[0] / 255, color[1] / 255, color[2] / 255)
-        overhead = [*color, alpha]
-        overhead.extend(overhead_data)
-        sprite = Sprite(pos, scale, cls._z, angle, image.uv.uv, image.get_tex_id(), static, program, unit, overhead)
-        cls._z += 1
+        color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
+        sprite = Sprite(image.get_tex_id(), image.uv.uv, pos, scale, angle, color, static, program, unit)
         ShaderRender.add_draw_call(sprite)
 
     @classmethod
@@ -38,18 +33,15 @@ class Draw:
                    scale: tuple,
                    angle: tuple=(0, 0, 0),
                    offset: tuple=(0, 0),
-                   color: tuple=(255, 255, 255),
+                   color: tuple=(255, 255, 255, 255),
                    alpha: float=1,
                    program: str=None,
                    unit=GL_TEXTURE0,
                    overhead_data=[]) -> None:
 
         if program == None: program = "def3d"
-        color = (color[0] / 255, color[1] / 255, color[2] / 255)
-        overhead = [*color, alpha]
-        overhead.extend(overhead_data)
+        color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
         sprite = Sprite3D(pos, scale, angle, offset, image.uv.uv, image.get_tex_id(), program, unit, overhead)
-        cls._z += 1
         ShaderRender.add_draw_call(sprite)
 
     @classmethod
@@ -99,7 +91,6 @@ class EntityTools:
     SHADERS = CWD / "src" / "shaders"
     ShaderManager.add_shader("def", SHADERS / "def.vsh", SHADERS / "def.fsh")
     _font: pg.font = None
-    _z = 0
 
     @staticmethod
     def get_default_shader_layout():

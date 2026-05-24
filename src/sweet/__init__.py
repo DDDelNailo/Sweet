@@ -20,6 +20,7 @@ def run():
 
 class Entity(entity.Entity):
     def __init__(
+                cls,
                 pos: tuple,
                 image: Imaging = None,
                 scale: tuple = (0, 0),

@@ -1,4 +1,4 @@
-from ..common import Draw, ConvertType, Rec, UVLocation, Sprite, Sprite3D
+from ..common import Draw, ConvertType, Rec, UVLocation, Sprite
 import pygame as pg
 from pygame.locals import *
 from OpenGL.GL import *
@@ -758,7 +758,7 @@ class ShaderManager:
 class ShaderRender:
     _draw_calls: list[Sprite] = []
     @classmethod
-    def add_draw_call(cls, sprite: Sprite | Sprite3D) -> None:
+    def add_draw_call(cls, sprite: Sprite) -> None:
         cls._draw_calls.append(sprite)
 
     @classmethod
