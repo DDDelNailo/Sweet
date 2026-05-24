@@ -86,10 +86,11 @@ Requires-Dist: Werkzeug==3.1.3
 Requires-Dist: wordfreq==3.1.1
 
 # Sweet
-Módulo de auxílio em construção de games
+Sweet é um módulo que objetiva facilitar a experiência do programador ao trabalhar com gráficos, estrutura de cenas, ferramentas de interação e em geral facilidade de uso.
 
-# Como jogar
-## Requisitos
+# Como usar?
 - Python 3.13
-Na pasta root, execute o comando ```pip install -r "requirements.txt"``` para baixar os módulos.
-Então, execute o arquivo ```game.py``` na pasta ```/app```.
+- Na pasta root da aplicação, execute o comando ```pip install .```
+
+# Documentação
+[Inicialização](https://github.com/Isaque-Ias/Sweet/wiki/Documenta%C3%A7%C3%A3o)

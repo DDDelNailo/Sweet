@@ -1,7 +1,7 @@
 from PIL import Image, ImageEnhance
 import uuid
-from .__shaders import ShaderManager, ShaderTexture
-from ..__common import *
+from .shaders import ShaderTexture
+from ..common import *
 from pathlib import Path
 import cv2
 import imageio
@@ -19,7 +19,8 @@ class Texture:
         
         for key in textures.keys():
             path = textures[key]
-            cls.set_texture(key, path)
+            absolute_path = Path.cwd() / path
+            cls.set_texture(key, absolute_path)
 
     @classmethod
     def set_texture(cls, name: str, path: Path) -> None:
@@ -31,6 +32,7 @@ class Texture:
             fps = cap.get(cv2.CAP_PROP_FPS)
 
             cls._textures[name] = Video(name, cap, FileType.STREAM, GL_BGR, ConvertType.VIDEO, fps, uuid.uuid4().hex)
+            cls._textures[name].upload()
             return cls._textures[name]
 
         elif path.suffix == '.gif':
@@ -48,16 +50,18 @@ class Texture:
                 file_type = FileType.DYNAMIC
             
             cls._textures[name] = Video(name, gif, file_type, image_format, ConvertType.GIF, occupation=uuid.uuid4().hex)
+            cls._textures[name].upload()
             return cls._textures[name]
 
         elif path.suffix in ['.png', '.jpg', '.jpeg']:
-            surface: Image.Image = Image.open(path).convert("RGBA")
+            surface: Image.Image = Image.open(path)
 
             file_type = FileType.BATCH
             if max(surface.width, surface.height) > 1024:
                 file_type = FileType.BACKGROUND
 
             cls._textures[name] = Imaging(name, surface, file_type, GL_RGBA, uuid.uuid4().hex)
+            cls._textures[name].upload()
             return cls._textures[name]
             
         else:
@@ -77,7 +81,7 @@ class Texture:
         del cls._textures[name]
 
 class Video:
-    def __init__(self, name: str, frames: Sequence[Draw], file_type: FileType, image_format: int, convert_type: ConvertType, fps: int=0, occupation:str = None) -> None:
+    def __init__(self, name: str, frames: Sequence[Drawing], file_type: FileType, image_format: int, convert_type: ConvertType, fps: int=0, occupation:str = None) -> None:
         self.name = name
         self.occupation = occupation
         self.image_format = image_format
@@ -92,7 +96,7 @@ class Video:
 
         self.set_frames(frames)
     
-    def set_frames(self, frames: Sequence[Draw], upload: bool=False) -> None:
+    def set_frames(self, frames: Sequence[Drawing], upload: bool=False) -> None:
         if self.convert_type == ConvertType.GIF:
             self._frames = frames
             self.total_frames = len(frames)
@@ -120,13 +124,13 @@ class Video:
         if not self.cap is None:
             self.cap.release()
 
-    def get_frames(self) -> Sequence[Draw]:
+    def get_frames(self) -> Sequence[Drawing]:
         return self._frames
 
-    def get_image(self) -> Draw:
+    def get_image(self) -> Drawing:
         return self.image
 
-    def get_tex_id(self) -> Draw:
+    def get_tex_id(self) -> Drawing:
         return self.uv.tex_id
 
     def upload(self) -> None:
@@ -134,14 +138,14 @@ class Video:
             raise ValueError("Sem ocupação definida")
         
         if self.file_type in [FileType.STREAM, FileType.DYNAMIC]:
-            self.uv = ShaderManager.add_texture(self.get_image(), self.convert_type, self.occupation)
+            self.uv = ShaderTexture.create_texture(self.get_image(), self.convert_type, self.occupation)
         elif self.file_type == FileType.BATCHLIST:
-            self.uv_list = ShaderManager.add_texture_atlas_list(self.get_frames(), self.convert_type, self.uv_list)
+            self.uv_list = ShaderTexture.create_texture_atlas_list(self.get_frames(), self.convert_type, self.uv_list)
             self.uv = self.uv_list[0]
         else:
             raise TypeError
         
-    def next_frame(self) -> Draw:
+    def next_frame(self) -> Drawing:
         self._current_frame += 1
         if self._current_frame >= self.total_frames:
             self._current_frame = 0
@@ -157,7 +161,7 @@ class Video:
                 ret, self.image = self.cap.read()
 
         if self.file_type in [FileType.STREAM, FileType.DYNAMIC]:
-            self.uv = ShaderManager.add_texture(self.get_image(), self.convert_type, self.occupation)
+            self.uv = ShaderTexture.create_texture(self.get_image(), self.convert_type, self.occupation)
         elif self.file_type == FileType.BATCHLIST:
             self.uv = self.uv_list[self._current_frame]
 
@@ -171,17 +175,28 @@ class Video:
             self.occupation = occupation
 
 class Imaging:
-    def __init__(self, name: str, image: Draw, file_type: FileType, image_format: int, occupation: str=None) -> None:
+    def __init__(self, name: str, image: Drawing, file_type: FileType, image_format: int, occupation: str=None) -> None:
         self.name = name
         self.occupation = occupation
         self.image_format = image_format
         self.file_type = file_type
         self.uploadead = False
+        self.opaque = self.opaque_test(image)
         self.uv = UVLocation()
 
         self.set_image(image)
     
-    def set_image(self, image: Draw, upload: bool=False) -> None:
+    def opaque_test(self, image: Drawing) -> bool:
+        if image.mode not in ('RGBA', 'LA') and 'transparency' not in image.info:
+            return True
+        
+        image.convert('RGBA')
+        alpha = image.split()[-1]
+        min_alpha, _ = alpha.getextrema()
+
+        return min_alpha == 255
+
+    def set_image(self, image: Drawing, upload: bool=False) -> None:
         self._image = image
 
         if upload:
@@ -207,9 +222,9 @@ class Imaging:
         if self.occupation == None:
             raise ValueError("Sem ocupação definida")
         if self.file_type in [FileType.DYNAMIC, FileType.BACKGROUND]:
-            self.uv = ShaderManager.add_texture(self.get_image(), ConvertType.IMAGE, self.occupation)
+            self.uv = ShaderTexture.create_texture(self.get_image(), ConvertType.IMAGE, self.occupation)
         elif self.file_type == FileType.BATCH:
-            self.uv = ShaderManager.add_texture_atlas(self.get_image(), ConvertType.IMAGE, self.uv)
+            self.uv = ShaderTexture.create_texture_atlas(self.get_image(), ConvertType.IMAGE, self.uv)
         else:
             raise TypeError
 

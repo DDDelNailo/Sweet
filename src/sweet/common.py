@@ -31,8 +31,8 @@ class Interpolation(Enum):
     QUAD = auto()
     NONE = auto()
 
-Draw: TypeAlias = pg.Surface | Image.Image | int
-TextureData: TypeAlias = dict[Draw, int, int]
+Drawing: TypeAlias = pg.Surface | Image.Image | int
+TextureData: TypeAlias = dict[Drawing, int, int]
 AtlasTexture: TypeAlias = dict[int, int, int]
 Vector: TypeAlias = list[int, int]
 Controls: TypeAlias = Sequence[Vector] | Sequence[list[Vector, Vector, Vector]]
@@ -66,6 +66,8 @@ class Sprite:
     scale: tuple
     rotation: tuple
     color: tuple
+    perspective: bool
     static: bool
     program: bool
+    attrs: dict
     unit: int

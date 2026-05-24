@@ -1,13 +1,12 @@
 import pygame as pg
-from .__common import Draw
+from .common import Drawing
 from pygame.locals import *
 import os
-from .graphics.__shaders import ShaderManager, ShaderRender
-from .graphics.__texture import Texture
+from .graphics.shaders import ShaderManager, ShaderRender
 from OpenGL.GL import *
-from .__entity import EntityManager, EntityTools
-from .__inputting import Input
-from .__testing import Testing
+from .entity import EntityManager
+from .inputting import Input
+from .testing import Testing
 from pathlib import Path
 
 class GameLoop:
@@ -41,7 +40,7 @@ class GameLoop:
         return cls._fullscreen
     
     @staticmethod
-    def set_icon(icon: Draw) -> None:
+    def set_icon(icon: Drawing) -> None:
         data = icon.tobytes()
         surface = pg.image.fromstring(data, icon.size, icon.mode)
         pg.display.set_icon(surface.convert())
@@ -104,6 +103,9 @@ class GameLoop:
     @classmethod
     def init(cls) -> None:
         ShaderManager.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
+        BASE_DIR = Path(__file__).resolve().parent
+        BUILD = BASE_DIR / "build"
+        ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
         ShaderManager.build_shaders()
         cls._built = True
 
@@ -164,10 +166,9 @@ class GameLoop:
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-            if not ShaderManager.get_current_shader() == "def":
-                ShaderManager.set_shader("def")
+            if not ShaderManager.get_current_shader() == "__def__":
+                ShaderManager.set_shader("__def__")
                 ShaderManager.set_uniform_value("u_texture", "1i", 0)
-                shader = ShaderManager.get_current_shader()
 
             if cls.debug:
                 Testing.cummulation_start()

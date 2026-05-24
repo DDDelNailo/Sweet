@@ -32,6 +32,10 @@ class Input:
         return cls._mouse_pos
 
     @classmethod
+    def set_mouse_visibility(cls, visible: bool) -> None:
+        pg.mouse.set_visible(visible)
+
+    @classmethod
     def update(cls) -> None:
         keys = pg.key.get_pressed()
         for inp in cls._keys:

@@ -1,1 +1,1 @@
-from . import __UI, __shaders, __texture
+from . import UI, shaders, texture

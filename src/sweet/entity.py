@@ -1,157 +1,48 @@
-from .graphics.__shaders import ShaderManager, ShaderRender
-from .graphics.__texture import Texture, Imaging, Video
-from .__camera import Camera, Cam
+from .graphics.shaders import ShaderManager, ShaderRender
+from .graphics.texture import Texture, Imaging, Video
 from OpenGL.GL import *
 import pygame as pg
-from .__common import TextureData, Sprite, Sprite3D
+from .common import TextureData, Sprite
 from typing import Sequence
-from .linalg.__vector import Vec
+from .vector import Vec2, Vec3
 from PIL import Image
 from pathlib import Path
-
-class Draw:
-    @classmethod
-    def draw_image(cls,
-                   image: Imaging | Video,
-                   pos: tuple,
-                   scale: tuple,
-                   angle: float=0,
-                   color: tuple=(255, 255, 255, 255),
-                   static: bool=False,
-                   program: str=None,
-                   unit=GL_TEXTURE0) -> None:
-
-        if program == None: program = "def"
-        color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
-        sprite = Sprite(image.get_tex_id(), image.uv.uv, pos, scale, angle, color, static, program, unit)
-        ShaderRender.add_draw_call(sprite)
-
-    @classmethod
-    def draw_image_3d(cls,
-                   image: Imaging | Video,
-                   pos: tuple,
-                   scale: tuple,
-                   angle: tuple=(0, 0, 0),
-                   offset: tuple=(0, 0),
-                   color: tuple=(255, 255, 255, 255),
-                   alpha: float=1,
-                   program: str=None,
-                   unit=GL_TEXTURE0,
-                   overhead_data=[]) -> None:
-
-        if program == None: program = "def3d"
-        color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
-        sprite = Sprite3D(pos, scale, angle, offset, image.uv.uv, image.get_tex_id(), program, unit, overhead)
-        ShaderRender.add_draw_call(sprite)
-
-    @classmethod
-    def set_font(cls, font: pg.font) -> None:
-        cls._font = font
-
-    @classmethod
-    def get_font(cls) -> pg.font:
-        return cls._font
-
-    @classmethod
-    def draw_text(cls,
-                  image: Imaging,
-                  text: str,
-                  pos: tuple,
-                  scale: tuple,
-                  angle: float=0,
-                  color: tuple=(255, 255, 255),
-                  alpha: float=1,
-                  static: bool=True,
-                  align: tuple=(0, 0),
-                  program: str=None,
-                   unit=GL_TEXTURE0) -> None:
-        font_surf: pg.Surface = cls.get_font().render(text, True, (255, 255, 255))
-        width: int
-        height: int
-
-        data = pg.image.tostring(font_surf, "RGBA", True)
-        size = font_surf.get_size()
-        new_image = Image.frombytes("RGBA", size, data)
-        image.set_image(new_image)
-        image.upload()
-
-        width, height = (image.width, image.height)
-        cls.draw_image(image,
-                       (pos[0] + width * scale[0] * align[0] / 2, pos[1] + height * scale[1] * align[1] / 2),
-                       (width * scale[0], height * scale[1]),
-                       angle=angle,
-                       color=color,
-                       alpha=alpha,
-                       static=static,
-                       program=program,
-                       unit=unit)
-
-class EntityTools:
-    CWD = Path.cwd()
-    SHADERS = CWD / "src" / "shaders"
-    ShaderManager.add_shader("def", SHADERS / "def.vsh", SHADERS / "def.fsh")
-    _font: pg.font = None
-
-    @staticmethod
-    def get_default_shader_layout():
-        return {"vao": [("iPos", 2),
-        ("iScale", 2),
-        ("iRot", 2),
-        ("iUVOff", 2),
-        ("iUVScale", 2),
-        ("iRgb", 3),
-        ("iAlpha", 1)]
-    }
-
-    @staticmethod
-    def get_default_3d_shader_layout():
-        return {"vao": [("iPos", 3),
-        ("iScale", 3),
-        ("iRot", 3),
-        ("iOffset", 2),
-        ("iUVOff", 2),
-        ("iUVScale", 2),
-        ("iView", 2),
-        ("iRgb", 3),
-        ("iAlpha", 1),
-        ]
-    }
-
-    @staticmethod
-    def get_cam(cam: str) -> Cam:
-        return Camera.get_camera(cam)
-
-    @classmethod
-    def get_default_shaders(cls) -> dict[str, str]:
-        return ShaderManager.get_shader_program("def")
-
-    @staticmethod
-    def get_screen_size() -> tuple:
-        return ShaderManager.get_size()
-
-    @staticmethod
-    def tex(tex) -> TextureData:
-        return Texture.get_texture(tex)
-
-    @staticmethod
-    def default_draw(entity) -> None:
-        ShaderManager.render(entity.get_mvp(), Texture.get_texture(entity.image))
+from math import pi
 
 class Entity:
     def __init__(self,
-                 pos: tuple,
                  image: Imaging=None,
-                 scale: tuple=(0, 0),
-                 angle: int=0,
+                 pos: tuple=(0, 0),
+                 scale: tuple=(1, 1),
+                 angle: float | tuple=0,
                  layer: int=0,
                  order: int=-1,
                  pre_tick: bool=False,
                  tick: bool=False,
                  pos_tick: bool=False) -> None:
-        self.pos = Vec(*pos)
+        
+        self.__flat = False
+        if len(pos) == 0:
+            self.__flat = True
+            
+        if self.__flat:
+            self.pos = Vec2(*pos)
+            self.scale = Vec2(*scale)
+            self.angle = angle
+        else:
+            self.pos = Vec3(*pos)
+
+            if len(scale) == 2:
+                self.scale = Vec3(scale[0], scale[1], 1)
+            else:
+                self.scale = Vec3(*scale)
+
+            if isinstance(angle, float) or isinstance(angle, int):
+                self.angle = Vec3(angle, 0, 0)
+            else:
+                self.angle = Vec3(*angle)
+
         self.image = image
-        self.scale = Vec(*scale)
-        self.angle = angle
         self.layer = int(layer)
         self.order = order
         self.mask = Mask()
@@ -424,21 +315,87 @@ class EntityManager:
     @classmethod
     def get_content_layers(cls, order: int) -> list[int]:
         return cls._content_layers[order]
-    
+
+class Draw:
+    _state_attr = {}
+    @classmethod
+    def set_shader_attr(cls, name: str, *values) -> None:
+        cls._state_attr[name] = values
+
+    @classmethod
+    def draw_image(cls,
+                   image: Imaging | Video,
+                   pos: Vec2 | Vec3,
+                   scale: Vec2 | Vec3,
+                   angle: float | Vec3,
+                   color: tuple=(255, 255, 255, 255),
+                   perspective: bool=True,
+                   static: bool=False) -> None:
+
+        program = ShaderManager.get_current_shader()
+        unit = GL_TEXTURE0
+
+        color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
+        angle = angle * pi / 180 if isinstance(angle, float) or isinstance(angle, int) else Vec3(angle.x * pi / 180, angle.y * pi / 180, angle.z * pi / 180)
+        sprite = Sprite(image.get_tex_id(), image.uv.uv, pos, scale, angle, color, perspective, static, program, cls._state_attr, unit)
+        ShaderRender.add_draw_call(sprite)
+
+    @classmethod
+    def set_font(cls, font: pg.font) -> None:
+        cls._font = font
+
+    @classmethod
+    def get_font(cls) -> pg.font:
+        return cls._font
+
+    @classmethod
+    def draw_text(cls,
+                  image: Imaging,
+                  text: str,
+                  pos: Vec2 | Vec3,
+                  scale: Vec2 | Vec3,
+                  angle: float | Vec3=0,
+                  color: tuple=(255, 255, 255),
+                  alpha: float=1,
+                  static: bool=True,
+                  align: tuple=(0, 0),
+                  program: str=None,
+                   unit=GL_TEXTURE0) -> None:
+        font_surf: pg.Surface = cls.get_font().render(text, True, (255, 255, 255))
+        width: int
+        height: int
+
+        data = pg.image.tostring(font_surf, "RGBA", True)
+        size = font_surf.get_size()
+        new_image = Image.frombytes("RGBA", size, data)
+        image.set_image(new_image)
+        image.upload()
+
+        width, height = (image.width, image.height)
+        cls.draw_image(image,
+                       (pos[0] + width * scale[0] * align[0] / 2, pos[1] + height * scale[1] * align[1] / 2),
+                       (width * scale[0], height * scale[1]),
+                       angle=angle,
+                       color=color,
+                       alpha=alpha,
+                       static=static,
+                       program=program,
+                       unit=unit)
+
 class Polygon:
-    def __init__(self, vertices: Sequence[Vec]) -> None:
+    def __init__(self, vertices: Sequence[Vec2]) -> None:
         self.vertices = vertices
 
     def rotate(self, angle: float) -> "Polygon":
         vertices = [vertex.rotate(angle) for vertex in self.vertices]
         return Polygon(vertices)
 
-    def translate(self, pos: Vec) -> "Polygon":
+    def translate(self, pos: Vec2) -> "Polygon":
         vertices = [vertex + pos for vertex in self.vertices]
         return Polygon(vertices)
 
-    def scale(self, multiplier: Vec) -> "Polygon":
-        vertices = [Vec(vertex.x * multiplier.x, vertex.y * multiplier.y) for vertex in self.vertices]
+    def scale(self, multiplier: Vec2) -> "Polygon":
+        vertices = [Vec2(vertex.x * multiplier.x, vertex.y * multiplier.y) for vertex in self.vertices]
         return Polygon(vertices)
 
 class Mask:

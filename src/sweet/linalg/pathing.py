@@ -1,5 +1,5 @@
-from sweet.__common import PathType, Interpolation, Controls
-from sweet.linalg.__vector import Vec
+from sweet.common import PathType, Interpolation, Controls
+from sweet.vector import Vec2
 from numpy import clip
 from math import comb
 from typing import Sequence
@@ -21,9 +21,9 @@ class Path:
         index = int(t * parts)
         return index - 1 if index == parts else index
 
-    def path_at(self, t: float) -> Vec:
+    def path_at(self, t: float) -> Vec2:
         if len(self._control_points) <= 1:
-            return Vec(0, 0)
+            return Vec2(0, 0)
         if t >= 1: t = 1
         index = self.get_sector(t)
         total_points = len(self._control_points)
@@ -40,7 +40,7 @@ class Path:
                 self._control_points[index+1][0],
                 self._control_points[index+1][1],
             ]
-            final_pos = Vec(0, 0)
+            final_pos = Vec2(0, 0)
             for i in range(4):
                 final_pos += comb(3, i) * interval_t ** i * (1 - interval_t) ** (3 - i) * controls[i]
             return final_pos

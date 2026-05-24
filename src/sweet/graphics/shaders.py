@@ -1,15 +1,15 @@
-from ..__common import Draw, ConvertType, Rec, UVLocation, Sprite, Sprite3D
+from ..common import Drawing, ConvertType, Rec, UVLocation, Sprite
 import pygame as pg
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
 import glm
 import numpy as np
-from math import sin, cos, radians
 from typing import Callable, Sequence
 import uuid
 from PIL import Image
 from dataclasses import dataclass, field
+from ..camera import CameraManager
 
 @dataclass
 class Attribute:
@@ -259,7 +259,7 @@ class ShaderTexture:
         return cls._atlas_loc[tex_id]
 
     @classmethod
-    def texture_to_bytes(cls, texture: Draw, convert_type: ConvertType) -> Draw:
+    def texture_to_bytes(cls, texture: Drawing, convert_type: ConvertType) -> Drawing:
         if convert_type == ConvertType.VIDEO:
             return cls._video_to_bytes(texture)
         elif convert_type == ConvertType.GIF:
@@ -268,14 +268,14 @@ class ShaderTexture:
             return cls._image_to_bytes(texture)
 
     @staticmethod
-    def _image_to_bytes(texture: Draw) -> Draw:
+    def _image_to_bytes(texture: Drawing) -> Drawing:
         texture = texture.convert("RGBA")
         width, height = texture.size
         texture = texture.tobytes()
         return texture, width, height, GL_RGBA
     
     @staticmethod
-    def _gif_to_bytes(texture: Draw) -> Draw:
+    def _gif_to_bytes(texture: Drawing) -> Drawing:
         height, width = texture.shape[:2]
 
         if texture.shape[2] == 3:
@@ -288,13 +288,13 @@ class ShaderTexture:
         return texture, width, height, image_format
 
     @staticmethod
-    def _video_to_bytes(texture: Draw) -> Draw:
+    def _video_to_bytes(texture: Drawing) -> Drawing:
         height, width = texture.shape[:2]
         texture = np.ascontiguousarray(texture)
         return texture, width, height, GL_BGR
 
     @classmethod
-    def create_texture_atlas_list(cls, frames: Sequence[Draw], convert_type: ConvertType, location: list[UVLocation]) -> UVLocation:
+    def create_texture_atlas_list(cls, frames: Sequence[Drawing], convert_type: ConvertType, location: list[UVLocation]) -> UVLocation:
         uv_list = []
         for i, frame in enumerate(frames):
             if len(location) == 0:
@@ -308,7 +308,7 @@ class ShaderTexture:
         return uv_list
 
     @classmethod
-    def update_texture_atlas_list(cls, frames: Sequence[Draw], convert_type: ConvertType, location: list[UVLocation]) -> None:
+    def update_texture_atlas_list(cls, frames: Sequence[Drawing], convert_type: ConvertType, location: list[UVLocation]) -> None:
         for i, frame in enumerate(frames):
             cls.update_texture_atlas(frame, convert_type, location[i])
 
@@ -318,7 +318,7 @@ class ShaderTexture:
             cls.delete_texture_atlas(loc)
 
     @classmethod
-    def create_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
+    def create_texture_atlas(cls, texture: Drawing, convert_type: ConvertType, location: UVLocation) -> UVLocation:
         image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
 
         if location.tex_id:
@@ -346,7 +346,7 @@ class ShaderTexture:
         return UVLocation(current_atlas.tex_id, rect)
 
     @classmethod
-    def update_texture_atlas(cls, texture: Draw, convert_type: ConvertType, location: UVLocation) -> UVLocation:
+    def update_texture_atlas(cls, texture: Drawing, convert_type: ConvertType, location: UVLocation) -> UVLocation:
         image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
         glBindTexture(GL_TEXTURE_2D, location.tex_id)
         glTexSubImage2D(
@@ -373,7 +373,7 @@ class ShaderTexture:
                 cls._atlas_array.remove(atlas)
 
     @classmethod
-    def create_texture(cls, texture: Draw, convert_type: ConvertType, occupation: str=None) -> tuple:
+    def create_texture(cls, texture: Drawing, convert_type: ConvertType, occupation: str=None) -> tuple:
         if occupation == None:
             occupation = uuid.uuid4().hex
             
@@ -403,11 +403,16 @@ class ShaderTexture:
             GL_UNSIGNED_BYTE,
             image)
 
+        # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR)
+        # glTexEnvf(GL_TEXTURE_FILTER_CONTROL, GL_TEXTURE_LOD_BIAS, -2)
+        # glGenerateMipmap(GL_TEXTURE_2D)
+
         cls._occupated_textures[occupation] = tex_id
         return UVLocation(tex_id, uv=Rec(x=0, y=0, w=width, h=height))
     
     @classmethod
-    def update_texture(cls, tex_id: int, texture: Draw, convert_type: ConvertType) -> int:
+    def update_texture(cls, tex_id: int, texture: Drawing, convert_type: ConvertType) -> int:
         glBindTexture(GL_TEXTURE_2D, tex_id)
         image, width, height, image_format = cls.texture_to_bytes(texture, convert_type)
         glTexImage2D(
@@ -448,7 +453,7 @@ class Shader:
         self.program = program
 
 class ShaderManager:
-    _current_program: str = None
+    _current_program: Shader = None
     _UNIFORM_FUNCS: dict[Callable] = {
         "1i": glUniform1i,
         "2i": glUniform2i,
@@ -512,9 +517,7 @@ class ShaderManager:
             cls.build_buffers(shader)
 
     @classmethod
-    def reflect_ubos(cls, shader: Shader) -> dict[str, UniformBlock]:
-        program = shader.program
-
+    def reflect_ubos(cls, program: int) -> dict[str, UniformBlock]:
         result = {}
 
         block_count = glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS)
@@ -526,7 +529,7 @@ class ShaderManager:
             name_length = length.value
 
             block_name = glGetActiveUniformBlockName(program, block_index, name_length)
-            block_name = bytes(block_name[1][:-1])
+            block_name = bytes(block_name[1][:-1]).decode()
 
             size = ctypes.c_int()
             glGetActiveUniformBlockiv(program, block_index, GL_UNIFORM_BLOCK_DATA_SIZE, size)
@@ -569,7 +572,7 @@ class ShaderManager:
                 matrix_stride = params[0]
 
                 member = UniformMember(
-                    name=name,
+                    name=name.decode(),
                     gl_type=cls._GL_TYPE_SIZES[gl_type],
                     size=size,
                     offset=offset,
@@ -591,9 +594,7 @@ class ShaderManager:
         return result
 
     @staticmethod
-    def reflect_ssbos(shader: Shader) -> dict[str, StorageBlock]:
-        program = shader.program
-
+    def reflect_ssbos(program: int) -> dict[str, StorageBlock]:
         result = {}
 
         block_count = glGetProgramiv(program, GL_SHADER_STORAGE_BLOCKS)
@@ -613,11 +614,9 @@ class ShaderManager:
         return result
 
     @classmethod
-    def reflect_instance_attributes(cls, shader: Shader) -> dict[str, Attribute]:
-        program = shader.program
-
+    def reflect_instance_attributes(cls, program: int, location_map: dict[int, int], locations: list) -> tuple[int, BufferLayout]:
         instance_vbo = None
-
+        instance_buffer = None
         MAX_SPRITES = 32768
 
         count = glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES)
@@ -626,34 +625,54 @@ class ShaderManager:
 
             instance_vbo = glGenBuffers(1)
             glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
-            instance_stride = sum(cls._GL_TYPE_SIZES[gl_type] for _, _, gl_type in (glGetActiveAttrib(program, i) for i in range(2, count))) * 4
-            glBufferData(GL_ARRAY_BUFFER, MAX_SPRITES * instance_stride * 4, None, GL_DYNAMIC_DRAW)
+
+            total_floats = 0
+            for i in range(2, count):
+                lookup_i = locations[i]
+                loc_map = location_map.get(lookup_i)
+
+                if loc_map is None:
+                    ValueError(f"Atributo {i} não possui correspondente adequado.")
+                    
+                name, size, gl_type = glGetActiveAttrib(program, loc_map)
+                total_floats += cls._GL_TYPE_SIZES[gl_type]
+                
+            instance_stride = total_floats * 4
+
+            glBufferData(GL_ARRAY_BUFFER, MAX_SPRITES * instance_stride, None, GL_DYNAMIC_DRAW)
             
             offset = 0
             for i in range(2, count):
-                name, size, gl_type = glGetActiveAttrib(program, i)
+                lookup_i = locations[i]
+                loc_map = location_map.get(lookup_i)
+
+                name, size, gl_type = glGetActiveAttrib(program, loc_map)
+                name_str = name.decode()
+                base_location = glGetAttribLocation(program, name_str)
+                
                 floats = cls._GL_TYPE_SIZES[gl_type]
-                instance_attributes.append(Attribute(name, i, size, floats, offset))
+                instance_attributes.append(Attribute(name_str, base_location, size, floats, offset))
 
                 if gl_type == GL_FLOAT_MAT4:
                     for column in range(4):
-                        location = i + column
-                        glEnableVertexAttribArray(location)
-                        glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, instance_stride, ctypes.c_void_p(offset + column * 16))
-                        glVertexAttribDivisor(location, 1)
+                        curr_location = base_location + column
+                        glEnableVertexAttribArray(curr_location)
+                        glAndPointerOffset = offset + (column * 16)
+                        glVertexAttribPointer(curr_location, 4, GL_FLOAT, GL_FALSE, instance_stride, ctypes.c_void_p(glAndPointerOffset))
+                        glVertexAttribDivisor(curr_location, 1)
                 else:
-                    glEnableVertexAttribArray(i)
-                    glVertexAttribPointer(i, floats, GL_FLOAT, GL_FALSE, instance_stride, ctypes.c_void_p(offset))
-                    glVertexAttribDivisor(i, 1)
+                    glEnableVertexAttribArray(base_location)
+                    glVertexAttribPointer(base_location, floats, GL_FLOAT, GL_FALSE, instance_stride, ctypes.c_void_p(offset))
+                    glVertexAttribDivisor(base_location, 1)
 
                 offset += floats * 4
             
-            instance_buffer = BufferLayout(instance_attributes, instance_stride)
+            instance_buffer = BufferLayout(instance_stride, instance_attributes)
 
         return instance_vbo, instance_buffer
 
     @classmethod
-    def reflect_quad_attributes(cls, shader: Shader) -> dict[str, Attribute]:
+    def reflect_quad_attributes(cls, program: int, location_map: dict[int, int]) -> tuple[int, BufferLayout]:
         vertices = np.array([
             -0.5, -0.5,  0.0,   0,  0,
              0.5, -0.5,  0.0,   1,  0,
@@ -661,7 +680,6 @@ class ShaderManager:
             -0.5,  0.5,  0.0,   0,  1,
         ], dtype=np.float32)
 
-        program = shader.program
         quad_attributes = []
 
         quad_vbo = glGenBuffers(1)
@@ -671,15 +689,21 @@ class ShaderManager:
 
         offset = 0
         for i in range(2):
-            name, size, gl_type = glGetActiveAttrib(program, i)
+            loc_map = location_map.get(i)
+            if loc_map is None:
+                raise ValueError(f"Atributo {i} não possui correspondente adequado.")
+            name, size, gl_type = glGetActiveAttrib(program, loc_map)
+            name_str = name.decode()
+            location = glGetAttribLocation(program, name_str)
             floats = cls._GL_TYPE_SIZES[gl_type]
-            quad_attributes.append(Attribute(name, i, size, floats, offset))
-            glEnableVertexAttribArray(i)
-            glVertexAttribPointer(i, floats, GL_FLOAT, GL_FALSE, vertex_stride, ctypes.c_void_p(offset))
+            quad_attributes.append(Attribute(name_str, location, size, floats, offset))
+            glEnableVertexAttribArray(location)
+            glVertexAttribPointer(location, floats, GL_FLOAT, GL_FALSE, vertex_stride, ctypes.c_void_p(offset))
+            glVertexAttribDivisor(location, 0)
 
             offset += floats * 4
 
-        quad_buffer = BufferLayout(quad_attributes, vertex_stride)
+        quad_buffer = BufferLayout(vertex_stride, quad_attributes)
         return quad_vbo, quad_buffer
 
     @staticmethod
@@ -697,13 +721,28 @@ class ShaderManager:
 
     @classmethod
     def build_buffers(cls, shader: Shader) -> object:
+        program = shader.program
+
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
+        
         ebo = cls.reflect_ebo()
-        quad_vbo, quad_buffer = cls.reflect_quad_attributes(shader)
-        instance_vbo, instance_buffer = cls.reflect_instance_attributes(shader)
-        ubos = cls.reflect_ubos(shader)
-        ssbos = None#cls.reflect_ssbos(shader)
+
+        location_map = {}
+        locations = []
+        count = glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES)
+        for i in range(count):
+            name, _, _ = glGetActiveAttrib(program, i)
+            name_str = name.decode()
+            location = glGetAttribLocation(program, name_str)
+            location_map[location] = i
+            locations.append(location)
+        locations.sort()
+
+        quad_vbo, quad_buffer = cls.reflect_quad_attributes(program, location_map)
+        instance_vbo, instance_buffer = cls.reflect_instance_attributes(program, location_map, locations)
+        ubos = cls.reflect_ubos(program)
+        ssbos = None#cls.reflect_ssbos(program)
 
         glBindVertexArray(0)
 
@@ -752,83 +791,117 @@ class ShaderManager:
         glClearColor(r / 255, g / 255, b / 255, a / 255)
 
         glEnable(GL_BLEND)
+        glEnable(GL_DEPTH_TEST)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
 class ShaderRender:
     _draw_calls: list[Sprite] = []
+    _PROJECTIONS = {}
+    _viewsize = (0, 0, 0, 0)
+    _fov = 70
+
+    @classmethod
+    def update_projections(cls, fov: float) -> None:
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        x, y, width, height = viewport
+        cls._viewsize = x, y, width, height
+        cls._fov = fov
+
+        cls._PROJECTIONS["perspective"] = glm.perspective(
+            glm.radians(cls._fov),
+            width / height,
+            0.1,
+            1000.0
+        )
+        cls._PROJECTIONS["orthogonal"] = glm.ortho(
+            -width / 100, width / 100,
+            -height / 100, height / 100,
+            -100,
+            100
+        )
+
     @classmethod
     def add_draw_call(cls, sprite: Sprite) -> None:
         cls._draw_calls.append(sprite)
 
     @classmethod
-    def render_batch(cls, texture: Draw, data: np.array, view: np.ndarray, unit=GL_TEXTURE0) -> None:
+    def render_batch(cls, texture: Drawing, data: np.array, count, view: np.ndarray, unit=GL_TEXTURE0) -> None:
         shaders = ShaderManager.get_current_shader()
         ubo = shaders.resources.ubos["Camera"].buffer_id
         glBindBuffer(GL_UNIFORM_BUFFER, ubo)
+
         glBufferSubData(
             GL_UNIFORM_BUFFER,
-            64,
+            0,
             view.nbytes,
             view
         )
         
         instance_vbo = shaders.vertex_state.instance_vbo
-        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
-        glBufferSubData(GL_ARRAY_BUFFER, 0, data.nbytes, data)
+        if instance_vbo is not None:
+            glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
+            glBufferSubData(GL_ARRAY_BUFFER, 0, data.nbytes, data)
         
         glActiveTexture(unit)
         glBindTexture(GL_TEXTURE_2D, texture)
 
+        glEnable(GL_DEPTH_TEST)
+        glDepthMask(GL_TRUE)
+        glDisable(GL_BLEND)
+
         vao = shaders.vertex_state.vao
         glBindVertexArray(vao)
-        instance_stride = shaders.vertex_state.instance_layout.stride
+        glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None, count)
 
-        instance_count = len(data) // (instance_stride // 4)
-        glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None, instance_count)
+    @staticmethod
+    def euler_view_mat(pitch, yaw, roll):
+        p_rad = glm.radians(pitch)
+        y_rad = glm.radians(yaw)
+        r_rad = glm.radians(roll)
+
+        pitch_quat = glm.angleAxis(p_rad, glm.vec3(1.0, 0.0, 0.0))
+        yaw_quat = glm.angleAxis(y_rad, glm.vec3(0.0, 1.0, 0.0))
+        roll_quat = glm.angleAxis(r_rad, glm.vec3(0.0, 0.0, 1.0))
+
+        orientation = yaw_quat * pitch_quat * roll_quat
+        
+        rotation_matrix = glm.mat4(glm.mat3_cast(orientation))
+
+        return rotation_matrix
 
     @classmethod
     def render(cls) -> None:
+        curr_camera = CameraManager.get_main_camera()
+        camera_angle = (-curr_camera.angles[1], curr_camera.angles[0], curr_camera.angles[2])
+        view = cls.euler_view_mat(*camera_angle)
+        view = np.array(view, dtype=np.float32).flatten()
+        
         viewport = glGetIntegerv(GL_VIEWPORT)
-        width = viewport[2]
-        height = viewport[3]
-        perspective = glm.perspective(
-            glm.radians(70.0),
-            width / height,
-            0.1,
-            1000.0
-        )
-        orthogonal = glm.ortho(
-            0, width,
-            height, 0,
-            -100,
-            100
-        )
-        view = glm.lookAt(
-            glm.vec3(0, 0, 5),
-            glm.vec3(0, 0, 0),
-            glm.vec3(0, 1, 0)
-        )
-        projection = perspective
+        x, y, width, height = viewport
+        if cls._viewsize != (x, y, width, height) or cls._fov != curr_camera.fov:
+            cls.update_projections(curr_camera.fov)
 
         batch = []
         last_texture_id = float("-inf")
         last_unit = float("-inf")
-        last_program = "def"
+        last_program = ShaderManager.get_shader("__def__")
+        last_perspective = True
 
         for sprite in cls._draw_calls:
             same_sprite = sprite.texture_id == last_texture_id
             same_unit = sprite.unit == last_unit
             same_program = sprite.program == last_program
-            same_batch = same_sprite and same_unit and same_program
+            same_projection = sprite.perspective == last_perspective
+            same_batch = same_sprite and same_unit and same_program and same_projection
 
             if not same_batch and batch:
                 data = cls.build_instance_buffer(batch)
 
-                if not same_program and not batch[0].program == "def":
+                if not same_program:
                     ShaderManager.set_shader(batch[0].program)
 
-                cls.render_batch(last_texture_id, data, view, unit=last_unit)
+                cls.render_batch(last_texture_id, data, len(batch), view, unit=last_unit)
 
                 batch = []
 
@@ -836,19 +909,27 @@ class ShaderRender:
             last_texture_id = sprite.texture_id
             last_unit = sprite.unit
             last_program = sprite.program
+            last_perspective = sprite.perspective
 
         if batch:
             data = cls.build_instance_buffer(batch)
 
-            if not same_program and not batch[0].program == "def":
+            if not same_program and not batch[0].program == ShaderManager.get_shader("__def__"):
                 ShaderManager.set_shader(batch[0].program)
 
-            cls.render_batch(last_texture_id, data, view, unit=last_unit)
+            cls.render_batch(last_texture_id, data, len(batch), view, unit=last_unit)
 
         cls._draw_calls = []
 
     @classmethod
     def build_instance_buffer(cls, sprites) -> np.array:
+        curr_camera = CameraManager.get_main_camera()
+        shader = ShaderManager.get_current_shader()
+        vertex_state = shader.vertex_state
+        if vertex_state.instance_layout == None:
+            instance_attributes = []
+        else:
+            instance_attributes = vertex_state.instance_layout.attributes
         data = []
 
         for s in sprites:
@@ -859,29 +940,30 @@ class ShaderRender:
             model = glm.mat4(1.0)
 
             model = glm.translate(model, glm.vec3(x, y, z))
+            model = glm.translate(model, glm.vec3(*(-curr_camera.pos)))
             model = glm.rotate(model, pitch, glm.vec3(1,0,0))
             model = glm.rotate(model, yaw, glm.vec3(0,1,0))
             model = glm.rotate(model, roll, glm.vec3(0,0,1))
             model = glm.scale(model, glm.vec3(w, h, t))
+
+            projection = cls._PROJECTIONS["perspective"] if s.perspective else cls._PROJECTIONS["orthogonal"]
             
-            u0 = s.uv.x / cls._atlas_size
-            v0 = s.uv.y / cls._atlas_size
-            us = s.uv.w / cls._atlas_size
-            vs = s.uv.h / cls._atlas_size
+            u0 = s.uv.x / ShaderTexture._atlas_size
+            v0 = s.uv.y / ShaderTexture._atlas_size
+            us = s.uv.w / ShaderTexture._atlas_size * 0.999
+            vs = s.uv.h / ShaderTexture._atlas_size * 0.999
 
-            o_x, o_y = s.offset
-
-            data.extend([
-                x, y, z,
-                w, h, t,
-                yaw, pitch, roll,
-                o_x, o_y,
-                u0, v0,
-                us, vs,
-                ShaderManager.screen_size[0],
-                ShaderManager.screen_size[1],
-            ])
-            data.extend(s.overhead)
+            for attr in instance_attributes:
+                if attr.name == "model":
+                    for column in range(4):
+                        data.extend(model[column])
+                elif attr.name == "projection":
+                    for column in range(4):
+                        data.extend(projection[column])
+                elif attr.name == "iUV":
+                    data.extend([u0, v0, us, vs])
+                else:
+                    data.extend(*s.attrs[attr.name])
 
         return np.array(data, dtype=np.float32)
 

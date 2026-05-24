@@ -1,9 +1,9 @@
 from OpenGL.GL import *
 from pygame.locals import *
-from .__vector import Vec
+from ..vector import Vec2
 from typing import Sequence, Callable
-from ..__common import Group, CollisionData
-from ..__entity import EntityManager, Mask, Polygon
+from ..common import CollisionData
+from ..entity import EntityManager, Polygon
 
 class Collision:
     @classmethod
@@ -33,19 +33,19 @@ class Collision:
     @staticmethod
     def colliding(a: object, b: object, polygon_a: Polygon, polygon_b: Polygon) -> CollisionData:
         lowest_overlap: float = float("inf")
-        overlap_axis: Vec = Vec(0, 0)
+        overlap_axis: Vec2 = Vec2(0, 0)
         is_b: bool = False
         x1, x2 = polygon_a.translate(a.pos), polygon_b.translate(b.pos)
 
-        contact_point: bool = Vec(0, 0)
+        contact_point: bool = Vec2(0, 0)
 
         for shape in (x1, x2):
             verts = shape.vertices
             for i in range(len(verts)):
-                v1: Vec = verts[i]
-                v2: Vec = verts[(i + 1) % len(verts)]
+                v1: Vec2 = verts[i]
+                v2: Vec2 = verts[(i + 1) % len(verts)]
 
-                axis: Vec = (v2 - v1).rotate90().normalize()
+                axis: Vec2 = (v2 - v1).rotate90().normalize()
 
                 min_a: float = float("inf")
                 max_a: float = float("-inf")
@@ -69,11 +69,11 @@ class Collision:
                 if overlap < lowest_overlap:
                     lowest_overlap: float = overlap
                     
-                    direction: Vec = (b.pos - a.pos)
+                    direction: Vec2 = (b.pos - a.pos)
                     if axis.dot(direction) < 0:
-                        axis: Vec = -axis
+                        axis: Vec2 = -axis
 
-                    overlap_axis: Vec = axis
+                    overlap_axis: Vec2 = axis
 
         return CollisionData(mtv=overlap_axis * lowest_overlap, normal=overlap_axis, is_b=is_b, contact_point=contact_point, entity=b)
 
@@ -81,7 +81,7 @@ class Collision:
     def get_collisions(cls, object) -> None:
         for x in range(-1, 2):
             for y in range(-1, 2):
-                key = cls.to_key((Vec(*object.mesh_coordinate) + (x, y)).unp())
+                key = cls.to_key((Vec2(*object.mesh_coordinate) + (x, y)).unp())
                 mesh_grid = cls.mesh.get(key)
                 if mesh_grid == None: continue
 
