@@ -20,7 +20,6 @@ void main()
         * view
         * model
         * vec4(a_position, 1.0);
-    // gl_Position.w = 1;
 
     v_texcoord = a_texcoord;
 

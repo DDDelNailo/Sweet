@@ -811,7 +811,7 @@ class ShaderRender:
         cls._PROJECTIONS["perspective"] = glm.perspective(
             glm.radians(cls._fov),
             width / height,
-            0.1,
+            0.01,
             1000.0
         )
         cls._PROJECTIONS["orthogonal"] = glm.ortho(
@@ -966,42 +966,3 @@ class ShaderRender:
                     data.extend(*s.attrs[attr.name])
 
         return np.array(data, dtype=np.float32)
-
-    # @classmethod
-    # def build_instance_buffer(cls, sprites, view_matrix, cam_scale, cam_angle) -> np.array:
-    #     data = []
-
-    #     cls.set_shader(sprites[0].program)
-
-    #     for s in sprites:
-    #         x, y = s.pos
-    #         w, h = s.scale
-    #         rotation = s.rotation
-
-    #         if not s.static:
-    #             pos = np.array([x, y, 0.0, 1.0], dtype=np.float32)
-    #             transformed = view_matrix @ pos
-    #             x, y = transformed[0], transformed[1]
-
-    #             w /= cam_scale[0]
-    #             h /= cam_scale[1]
-    #             rotation -= cam_angle
-
-    #         cos_r = cos(radians(rotation))
-    #         sin_r = sin(radians(rotation))
-
-    #         u0 = s.uv.x / cls._atlas_size
-    #         v0 = s.uv.y / cls._atlas_size
-    #         us = s.uv.w / cls._atlas_size
-    #         vs = s.uv.h / cls._atlas_size
-
-    #         data.extend([
-    #             x, y,
-    #             w, h,
-    #             cos_r, sin_r,
-    #             u0, v0,
-    #             us, vs,
-    #         ])
-    #         data.extend(s.overhead)
-
-    #     return np.array(data, dtype=np.float32)

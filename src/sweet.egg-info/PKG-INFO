@@ -52,6 +52,7 @@ Requires-Dist: pyarrow==21.0.0
 Requires-Dist: pycparser==2.23
 Requires-Dist: pydeck==0.9.1
 Requires-Dist: pygame==2.6.1
+Requires-Dist: pyglm==2.8.3
 Requires-Dist: pynput==1.8.1
 Requires-Dist: PyOpenGL==3.1.10
 Requires-Dist: pyperclip==1.9.0

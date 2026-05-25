@@ -4,11 +4,12 @@ import pygame
 from pygame.locals import *
 import sweet as sw
 from pathlib import Path
-from sweet.vector import Vec3
+from sweet.vector import Vec3, Vec2
 
 sw.Display.resizable(True)
 screen_size = sw.Display.screen_size
 sw.Display.size((screen_size[0], screen_size[1]))
+sw.Display.background((176, 247, 255, 255))
 
 sw.init()
 
@@ -23,25 +24,32 @@ class test(sw.Entity):
         self.mouse_x, self.mouse_y = sw.inputting.Input.get_mouse_pos()
         self.perspective = True
         self.fov = 70
-        self.speed = 0.1
+        self.speed = 0.005
+        self.velocity = Vec3(0, 0, 0)
         sw.inputting.Input.set_mouse_visibility(False)
 
     def tick(self):
         direction = self.camera_angle.direction() * self.speed
+        norm = Vec2(direction.x, direction.y).magnitude()
+        print(norm)
+        self.velocity.y -= .0005
+        self.pos += self.velocity
+
         if sw.inputting.Input.get_press(K_w):
-            self.pos -= direction
+            self.pos.x -= math.sin(math.radians(self.camera_angle.x)) * self.speed
+            self.pos.z -= math.cos(math.radians(self.camera_angle.x)) * self.speed
         if sw.inputting.Input.get_press(K_s):
-            self.pos += direction
+            self.pos.x += math.sin(math.radians(self.camera_angle.x)) * self.speed
+            self.pos.z += math.cos(math.radians(self.camera_angle.x)) * self.speed
         if sw.inputting.Input.get_press(K_a):
-            self.pos.z += math.sin(math.radians(self.camera_angle.x)) * .1
-            self.pos.x -= math.cos(math.radians(self.camera_angle.x)) * .1
+            self.pos.x -= math.cos(math.radians(self.camera_angle.x)) * self.speed
+            self.pos.z += math.sin(math.radians(self.camera_angle.x)) * self.speed
         if sw.inputting.Input.get_press(K_d):
-            self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * .1
-            self.pos.x += math.cos(math.radians(self.camera_angle.x)) * .1
-        if sw.inputting.Input.get_press(K_SPACE):
-            self.pos.y += .1
-        if sw.inputting.Input.get_press(K_LSHIFT):
-            self.pos.y -= .1
+            self.pos.x += math.cos(math.radians(self.camera_angle.x)) * self.speed
+            self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * self.speed
+        self.pos.y = max(self.pos.y, .1)
+        if sw.inputting.Input.get_pressed(K_SPACE) and self.pos.y <= .1:
+            self.velocity.y = .01
 
         if sw.inputting.Input.get_press(K_TAB):
             self.perspective = not self.perspective
@@ -61,8 +69,8 @@ class test(sw.Entity):
         mouse_dy = mouse_y - self.mouse_y
         self.mouse_x, self.mouse_y = mouse_x, mouse_y
         
-        self.camera_angle.x -= mouse_dx * .5
-        self.camera_angle.y += mouse_dy * .5
+        self.camera_angle.x -= mouse_dx * .2
+        self.camera_angle.y += mouse_dy * .2
         self.camera_angle.y = min(89.9, max(-89.9, self.camera_angle.y))
         main_cam.angles = self.camera_angle
 
