@@ -48,6 +48,16 @@ class Entity(entity.Entity):
 class Display:
     screen_size = (looping.GameLoop.view_width, looping.GameLoop.view_height)
 
+    def set_shader(name):
+        entity.Draw._state_shader = name
+
+    def add_shader(path_vertex, path_fragment, name=None):
+        if name is None:
+            # Extracts the file name of the vertex shaders without the extension
+            name = path_vertex.split("/")[-1].split(".")[0]
+            
+        graphics.shaders.ShaderManager.add_shader(name, path_vertex, path_fragment)
+
     @staticmethod
     def size(size):
         looping.GameLoop.set_screen_size(size)

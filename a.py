@@ -9,29 +9,29 @@ from sweet.vector import Vec3, Vec2
 sw.Display.resizable(True)
 screen_size = sw.Display.screen_size
 sw.Display.size((screen_size[0], screen_size[1]))
-sw.Display.background((176, 247, 255, 255))
+sw.Display.background((255, 230, 147, 255))
+sw.Display.add_shader("resources/shader/game.vsh", "resources/shader/game.fsh")
 
 sw.init()
 
 CWD = Path.cwd()
-
 sw.Textures.load_json_resource(CWD / "images.json")
 
 class test(sw.Entity):
     def __init__(self):
-        super().__init__(sw.Textures.get("player"), (0, 0, -1), order=3, tick=True)
-        self.camera_angle = Vec3(0, 0, 0)
+        super().__init__(sw.Textures.get("player"), (0, 0, 175), order=3, tick=True)
+        self.camera_angle = Vec3(-.2, -.2, 0)
         self.mouse_x, self.mouse_y = sw.inputting.Input.get_mouse_pos()
         self.perspective = True
         self.fov = 70
-        self.speed = 0.005
+        self.speed = 5
         self.velocity = Vec3(0, 0, 0)
         sw.inputting.Input.set_mouse_visibility(False)
+        self.width, self.height = self.image.get_width(), self.image.get_height()
 
     def tick(self):
         direction = self.camera_angle.direction() * self.speed
-        norm = Vec2(direction.x, direction.y).magnitude()
-        self.velocity.y -= .0005
+        self.velocity.y -= .5
         self.pos += self.velocity
 
         if sw.inputting.Input.get_press(K_w):
@@ -46,9 +46,9 @@ class test(sw.Entity):
         if sw.inputting.Input.get_press(K_d):
             self.pos.x += math.cos(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * self.speed
-        self.pos.y = max(self.pos.y, .1)
-        if sw.inputting.Input.get_pressed(K_SPACE) and self.pos.y <= .1:
-            self.velocity.y = .01
+        self.pos.y = max(self.pos.y, 20)
+        if sw.inputting.Input.get_pressed(K_SPACE) and self.pos.y <= 20:
+            self.velocity.y = 10
 
         if sw.inputting.Input.get_press(K_TAB):
             self.perspective = not self.perspective
@@ -71,6 +71,7 @@ class test(sw.Entity):
         self.camera_angle.x -= mouse_dx * .2
         self.camera_angle.y += mouse_dy * .2
         self.camera_angle.y = min(89.9, max(-89.9, self.camera_angle.y))
+        self.camera_angle = Vec3(0, 0, 0)
         main_cam.angles = self.camera_angle
 
         if self.mouse_x == 0 or self.mouse_x == screen_size[0] - 1:
@@ -81,10 +82,14 @@ class test(sw.Entity):
             self.mouse_y = screen_size[1] // 2
 
     def draw(self):
-        self.scale = Vec3(.1, 1, 1)
-        sw.entity.Draw.draw_image(self.image, Vec3(0, 0, -5), self.scale * 10, self.angle, perspective=self.perspective)
-        sw.entity.Draw.draw_image(sw.Textures.get("floor"), Vec3(0, 0, -5), Vec3(10, 10, 10), Vec3(90, 0, 0), perspective=self.perspective)
-
+        sw.Display.set_shader("game")
+        self.scale = Vec3(self.width, self.height, 1)
+        for i in range(-15, 15):
+            sw.entity.Draw.draw_image(self.image, Vec3(self.width * i, self.height // 2, 0), self.scale, self.angle, perspective=self.perspective)
+        floor = sw.Textures.get("floor")
+        sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 10), Vec3(90, 0, 0), perspective=self.perspective)
+        sw.entity.Draw.draw_image(floor, Vec3(0, 0, 0), Vec3(1, 1, 1), Vec3(90, 0, 0), perspective=self.perspective)
+        
 test()
 
 sw.run()

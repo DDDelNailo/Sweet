@@ -318,6 +318,7 @@ class EntityManager:
 
 class Draw:
     _state_attr = {}
+    _state_shader: str = "__def__"
     @classmethod
     def set_shader_attr(cls, name: str, *values) -> None:
         cls._state_attr[name] = values
@@ -331,13 +332,12 @@ class Draw:
                    color: tuple=(255, 255, 255, 255),
                    perspective: bool=True,
                    static: bool=False) -> None:
-
-        program = ShaderManager.get_current_shader()
+        
         unit = GL_TEXTURE0
 
         color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
         angle = angle * pi / 180 if isinstance(angle, float) or isinstance(angle, int) else Vec3(angle.x * pi / 180, angle.y * pi / 180, angle.z * pi / 180)
-        sprite = Sprite(image.get_tex_id(), image.uv.uv, pos, scale, angle, color, perspective, static, program, cls._state_attr, unit)
+        sprite = Sprite(image.get_tex_id(), image.uv.uv, pos, scale, angle, color, perspective, static, cls._state_shader, cls._state_attr, unit)
         ShaderRender.add_draw_call(sprite)
 
     @classmethod

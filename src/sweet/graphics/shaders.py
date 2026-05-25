@@ -767,6 +767,7 @@ class ShaderManager:
         shader = cls.get_shader(name)
         glUseProgram(shader.program)
         cls._current_program = shader
+        cls.set_uniform_value("u_texture", "1i", 0)
         
     @classmethod
     def get_current_shader(cls) -> Shader:
@@ -828,6 +829,11 @@ class ShaderRender:
     def render_batch(cls, texture: Drawing, data: np.array, count, view: np.ndarray, unit=GL_TEXTURE0) -> None:
         shaders = ShaderManager.get_current_shader()
         ubo = shaders.resources.ubos["Camera"].buffer_id
+        print(shaders.vertex[:20])
+
+        vao = shaders.vertex_state.vao
+        glBindVertexArray(vao)
+        
         glBindBuffer(GL_UNIFORM_BUFFER, ubo)
 
         glBufferSubData(
@@ -835,6 +841,12 @@ class ShaderRender:
             0,
             view.nbytes,
             view
+        )
+        glBufferSubData(
+            GL_UNIFORM_BUFFER,
+            64,
+            8,
+            np.array([0, .2], dtype=np.float32)
         )
         
         instance_vbo = shaders.vertex_state.instance_vbo
@@ -849,8 +861,6 @@ class ShaderRender:
         glDepthMask(GL_TRUE)
         glDisable(GL_BLEND)
 
-        vao = shaders.vertex_state.vao
-        glBindVertexArray(vao)
         glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None, count)
 
     @staticmethod
@@ -884,38 +894,34 @@ class ShaderRender:
         batch = []
         last_texture_id = float("-inf")
         last_unit = float("-inf")
-        last_program = ShaderManager.get_shader("__def__")
+        last_shader = "__def__"
         last_perspective = True
 
         for sprite in cls._draw_calls:
             same_sprite = sprite.texture_id == last_texture_id
             same_unit = sprite.unit == last_unit
-            same_program = sprite.program == last_program
+            same_shader = sprite.shader == last_shader
             same_projection = sprite.perspective == last_perspective
-            same_batch = same_sprite and same_unit and same_program and same_projection
-
+            same_batch = same_sprite and same_unit and same_shader and same_projection
+            
             if not same_batch and batch:
                 data = cls.build_instance_buffer(batch)
-
-                if not same_program:
-                    ShaderManager.set_shader(batch[0].program)
 
                 cls.render_batch(last_texture_id, data, len(batch), view, unit=last_unit)
 
                 batch = []
 
+            if not same_shader:
+                ShaderManager.set_shader(sprite.shader)
+
             batch.append(sprite)
             last_texture_id = sprite.texture_id
             last_unit = sprite.unit
-            last_program = sprite.program
+            last_shader = sprite.shader
             last_perspective = sprite.perspective
 
         if batch:
             data = cls.build_instance_buffer(batch)
-
-            if not same_program and not batch[0].program == ShaderManager.get_shader("__def__"):
-                ShaderManager.set_shader(batch[0].program)
-
             cls.render_batch(last_texture_id, data, len(batch), view, unit=last_unit)
 
         cls._draw_calls = []

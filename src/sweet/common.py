@@ -68,6 +68,6 @@ class Sprite:
     color: tuple
     perspective: bool
     static: bool
-    program: bool
+    shader: bool
     attrs: dict
     unit: int
