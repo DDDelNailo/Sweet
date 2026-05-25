@@ -11,6 +11,7 @@ from . import (
     looping,
     network,
     testing,
+    path_solver,
 )
 
 def init():

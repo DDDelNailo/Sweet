@@ -10,6 +10,7 @@ import uuid
 from PIL import Image
 from dataclasses import dataclass, field
 from ..camera import CameraManager
+from ..path_solver import solve_path
 
 @dataclass
 class Attribute:
@@ -498,9 +499,11 @@ class ShaderManager:
 
     @classmethod
     def add_shader(cls, name, path_vertex, path_fragment) -> None:
-        with open(path_vertex, "r") as file:
+        absolute_vertex = solve_path(path_vertex)
+        absolute_fragment = solve_path(path_fragment)
+        with open(absolute_vertex, "r") as file:
             VERTEX_SHADER = file.read()
-        with open(path_fragment, "r") as file:
+        with open(absolute_fragment, "r") as file:
             FRAGMENT_SHADER = file.read()
 
         cls._shaders[name] = Shader(vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER)
@@ -538,10 +541,6 @@ class ShaderManager:
             bind = ctypes.c_int()
             glGetActiveUniformBlockiv(program, block_index, GL_UNIFORM_BLOCK_BINDING, bind)
             binding = bind.value
-            
-            # indices = ctypes.c_int()
-            # glGetActiveUniformBlockiv(program, block_index, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, indices)
-            # uniform_indices = indices.value
 
             count = ctypes.c_int()
             glGetActiveUniformBlockiv(program, block_index, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, count)
