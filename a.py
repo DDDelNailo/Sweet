@@ -31,7 +31,6 @@ class test(sw.Entity):
     def tick(self):
         direction = self.camera_angle.direction() * self.speed
         norm = Vec2(direction.x, direction.y).magnitude()
-        print(norm)
         self.velocity.y -= .0005
         self.pos += self.velocity
 
