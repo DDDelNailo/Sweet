@@ -11,6 +11,7 @@ from PIL import Image
 from dataclasses import dataclass, field
 from ..camera import CameraManager
 from ..path_solver import solve_path
+import traceback
 
 @dataclass
 class Attribute:
@@ -439,7 +440,9 @@ class ShaderTexture:
         return cls._occupated_textures[occupation]
     
 class Shader:
-    def __init__(self, vertex: str, fragment: str) -> None:
+    def __init__(self, name:str, vertex: str, fragment: str) -> None:
+        self.built = False
+        self.name = name
         self.vertex = vertex
         self.fragment = fragment
 
@@ -506,24 +509,33 @@ class ShaderManager:
         with open(absolute_fragment, "r") as file:
             FRAGMENT_SHADER = file.read()
 
-        cls._shaders[name] = Shader(vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER)
+        cls._shaders[name] = Shader(name=name, vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER)
+        cls.build_shader(cls._shaders[name])
 
     @classmethod
     def get_shader(cls, name: str) -> Shader:
         return cls._shaders[name]
 
     @classmethod
-    def build_shaders(cls) -> None:
-        for shader in cls._shaders.values():
+    def build_shader(cls, shader: Shader) -> None:
+        if shader.built == False:
             vertex, fragment = shader.vertex, shader.fragment
             shader.set_program(cls.compile_shader(vertex, fragment))
             cls.build_buffers(shader)
+
+    @classmethod
+    def build_all_shaders(cls) -> None:
+        for shader in cls._shaders.values():
+            cls.build_shader(shader)
 
     @classmethod
     def reflect_ubos(cls, program: int) -> dict[str, UniformBlock]:
         result = {}
 
         block_count = glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS)
+
+        ubo = glGenBuffers(1)
+        glBindBuffer(GL_UNIFORM_BUFFER, ubo)
 
         for block_index in range(block_count):
 
@@ -581,8 +593,6 @@ class ShaderManager:
 
                 block.members.append(member)
 
-            ubo = glGenBuffers(1)
-            glBindBuffer(GL_UNIFORM_BUFFER, ubo)
             glBufferData(GL_UNIFORM_BUFFER, block.data_size, None, GL_DYNAMIC_DRAW)
             glBindBufferBase(GL_UNIFORM_BUFFER, block.binding, ubo)
 
@@ -590,27 +600,29 @@ class ShaderManager:
 
             result[block.name] = block
 
-        return result
-
-    @staticmethod
-    def reflect_ssbos(program: int) -> dict[str, StorageBlock]:
-        result = {}
-
-        block_count = glGetProgramiv(program, GL_SHADER_STORAGE_BLOCKS)
-
-        for block_index in range(block_count):
-            block_name = glGetActiveShaderStorageBlockName(program, block_index)
-            block_size = glGetActiveShaderStorageBlockiv(program, block_index, GL_SHADER_STORAGE_BLOCK_DATA_SIZE)
-            binding = glGetActiveShaderStorageBlockiv(program, block_index, GL_SHADER_STORAGE_BLOCK_BINDING)
-
-            ssbo = glGenBuffers(1)
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo)
-            glBufferData(GL_SHADER_STORAGE_BUFFER, block_size, None, GL_DYNAMIC_DRAW)
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo)
-
-            result[block_name] = StorageBlock(name=block_name, binding=binding, size=block_size, buffer_id=ssbo)
+        glBindBuffer(GL_UNIFORM_BUFFER, 0)
 
         return result
+
+    # @staticmethod
+    # def reflect_ssbos(program: int) -> dict[str, StorageBlock]:
+    #     result = {}
+
+    #     block_count = glGetProgramiv(program, GL_SHADER_STORAGE_BLOCKS)
+
+    #     for block_index in range(block_count):
+    #         block_name = glGetActiveShaderStorageBlockName(program, block_index)
+    #         block_size = glGetActiveShaderStorageBlockiv(program, block_index, GL_SHADER_STORAGE_BLOCK_DATA_SIZE)
+    #         binding = glGetActiveShaderStorageBlockiv(program, block_index, GL_SHADER_STORAGE_BLOCK_BINDING)
+
+    #         ssbo = glGenBuffers(1)
+    #         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo)
+    #         glBufferData(GL_SHADER_STORAGE_BUFFER, block_size, None, GL_DYNAMIC_DRAW)
+    #         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo)
+
+    #         result[block_name] = StorageBlock(name=block_name, binding=binding, size=block_size, buffer_id=ssbo)
+
+    #     return result
 
     @classmethod
     def reflect_instance_attributes(cls, program: int, location_map: dict[int, int], locations: list) -> tuple[int, BufferLayout]:
@@ -668,6 +680,8 @@ class ShaderManager:
             
             instance_buffer = BufferLayout(instance_stride, instance_attributes)
 
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+
         return instance_vbo, instance_buffer
 
     @classmethod
@@ -702,6 +716,8 @@ class ShaderManager:
 
             offset += floats * 4
 
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+
         quad_buffer = BufferLayout(vertex_stride, quad_attributes)
         return quad_vbo, quad_buffer
 
@@ -715,6 +731,8 @@ class ShaderManager:
         ebo = glGenBuffers(1)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
         return ebo
 
@@ -738,16 +756,23 @@ class ShaderManager:
             locations.append(location)
         locations.sort()
 
+        # print(locations, location_map)
+
         quad_vbo, quad_buffer = cls.reflect_quad_attributes(program, location_map)
         instance_vbo, instance_buffer = cls.reflect_instance_attributes(program, location_map, locations)
         ubos = cls.reflect_ubos(program)
         ssbos = None#cls.reflect_ssbos(program)
 
-        glBindVertexArray(0)
 
         vertex_state = VertexArrayState(vao, quad_vbo, instance_vbo, ebo, quad_buffer, instance_buffer)
         resources = ShaderResources(ubos, ssbos)
         shader.set_state(vertex_state, resources)
+        shader.built = True
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_UNIFORM_BUFFER, 0)
+        glBindVertexArray(0)
 
     @classmethod
     def get_shader(cls, name: str) -> Shader:
@@ -765,6 +790,8 @@ class ShaderManager:
     @classmethod
     def set_shader(cls, name: str) -> None:
         shader = cls.get_shader(name)
+        print(shader.program, name)
+        traceback.print_stack()
         glUseProgram(shader.program)
         cls._current_program = shader
         cls.set_uniform_value("u_texture", "1i", 0)
@@ -811,8 +838,8 @@ class ShaderRender:
         cls._PROJECTIONS["perspective"] = glm.perspective(
             glm.radians(cls._fov),
             width / height,
-            0.01,
-            1000.0
+            0.1,
+            10000.0
         )
         cls._PROJECTIONS["orthogonal"] = glm.ortho(
             -width / 100, width / 100,
@@ -829,8 +856,7 @@ class ShaderRender:
     def render_batch(cls, texture: Drawing, data: np.array, count, view: np.ndarray, unit=GL_TEXTURE0) -> None:
         shaders = ShaderManager.get_current_shader()
         ubo = shaders.resources.ubos["Camera"].buffer_id
-        print(shaders.vertex[:20])
-
+        # print(shaders.name, shaders.vertex_state, shaders.resources)
         vao = shaders.vertex_state.vao
         glBindVertexArray(vao)
         
@@ -842,12 +868,12 @@ class ShaderRender:
             view.nbytes,
             view
         )
-        glBufferSubData(
-            GL_UNIFORM_BUFFER,
-            64,
-            8,
-            np.array([0, .2], dtype=np.float32)
-        )
+        # glBufferSubData(
+        #     GL_UNIFORM_BUFFER,
+        #     64,
+        #     8,
+        #     np.array([0, .2], dtype=np.float32)
+        # )
         
         instance_vbo = shaders.vertex_state.instance_vbo
         if instance_vbo is not None:
@@ -857,9 +883,18 @@ class ShaderRender:
         glActiveTexture(unit)
         glBindTexture(GL_TEXTURE_2D, texture)
 
-        glEnable(GL_DEPTH_TEST)
-        glDepthMask(GL_TRUE)
-        glDisable(GL_BLEND)
+        # glEnable(GL_DEPTH_TEST)
+        # glDepthMask(GL_TRUE)
+        # glDisable(GL_BLEND)
+
+        # glDepthMask(GL_FALSE)
+
+        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
+
+        ebo = shaders.vertex_state.ebo
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+
+        # print(ubo, vao, instance_vbo, ebo)
 
         glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None, count)
 
@@ -911,7 +946,7 @@ class ShaderRender:
 
                 batch = []
 
-            if not same_shader:
+            if not same_shader and not ShaderManager.get_current_shader().name == sprite.shader:
                 ShaderManager.set_shader(sprite.shader)
 
             batch.append(sprite)

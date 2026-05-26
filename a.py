@@ -10,7 +10,6 @@ sw.Display.resizable(True)
 screen_size = sw.Display.screen_size
 sw.Display.size((screen_size[0], screen_size[1]))
 sw.Display.background((255, 230, 147, 255))
-sw.Display.add_shader("resources/shader/game.vsh", "resources/shader/game.fsh")
 
 sw.init()
 
@@ -20,7 +19,7 @@ sw.Textures.load_json_resource(CWD / "images.json")
 class test(sw.Entity):
     def __init__(self):
         super().__init__(sw.Textures.get("player"), (0, 0, 175), order=3, tick=True)
-        self.camera_angle = Vec3(-.2, -.2, 0)
+        self.camera_angle = Vec3(0, 0, 0)
         self.mouse_x, self.mouse_y = sw.inputting.Input.get_mouse_pos()
         self.perspective = True
         self.fov = 70
@@ -48,7 +47,7 @@ class test(sw.Entity):
             self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * self.speed
         self.pos.y = max(self.pos.y, 20)
         if sw.inputting.Input.get_pressed(K_SPACE) and self.pos.y <= 20:
-            self.velocity.y = 10
+            self.velocity.y = 20
 
         if sw.inputting.Input.get_press(K_TAB):
             self.perspective = not self.perspective
@@ -71,6 +70,7 @@ class test(sw.Entity):
         self.camera_angle.x -= mouse_dx * .2
         self.camera_angle.y += mouse_dy * .2
         self.camera_angle.y = min(89.9, max(-89.9, self.camera_angle.y))
+
         self.camera_angle = Vec3(0, 0, 0)
         main_cam.angles = self.camera_angle
 
@@ -82,13 +82,17 @@ class test(sw.Entity):
             self.mouse_y = screen_size[1] // 2
 
     def draw(self):
-        sw.Display.set_shader("game")
-        self.scale = Vec3(self.width, self.height, 1)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(self.image, Vec3(self.width * i, self.height // 2, 0), self.scale, self.angle, perspective=self.perspective)
         floor = sw.Textures.get("floor")
-        sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 10), Vec3(90, 0, 0), perspective=self.perspective)
-        sw.entity.Draw.draw_image(floor, Vec3(0, 0, 0), Vec3(1, 1, 1), Vec3(90, 0, 0), perspective=self.perspective)
+        wall = sw.Textures.get("wall")
+        pillar = sw.Textures.get("pillar")
+        front_pillar = sw.Textures.get("front_pillar")
+        sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 1), Vec3(90, 0, 0), perspective=self.perspective)
+        for i in range(-15, 15):
+            sw.entity.Draw.draw_image(wall, Vec3(wall.get_width() * i, wall.get_height() // 2, 0), Vec3(wall.get_width(), wall.get_height(), 1), self.angle, perspective=self.perspective)
+        for i in range(-15, 15):
+            sw.entity.Draw.draw_image(pillar, Vec3(pillar.get_width() * i, pillar.get_height() // 2, 50), Vec3(pillar.get_width(), pillar.get_height(), 1), self.angle, perspective=self.perspective)
+        for i in range(-15, 15):
+            sw.entity.Draw.draw_image(front_pillar, Vec3(400 * i, 0, 170), Vec3(front_pillar.get_width(), front_pillar.get_height(), 1), self.angle, perspective=self.perspective)
         
 test()
 

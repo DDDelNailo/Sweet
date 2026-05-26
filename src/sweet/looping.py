@@ -106,7 +106,9 @@ class GameLoop:
         BASE_DIR = Path(__file__).resolve().parent
         BUILD = BASE_DIR / "build"
         ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
-        ShaderManager.build_shaders()
+        ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
+        # ShaderManager.build_shaders()
+        ShaderManager.set_shader("__def__")
         cls._built = True
 
     @classmethod
@@ -166,9 +168,9 @@ class GameLoop:
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-            if not ShaderManager.get_current_shader() == "__def__":
-                ShaderManager.set_shader("__def__")
-                ShaderManager.set_uniform_value("u_texture", "1i", 0)
+            # if not ShaderManager.get_current_shader() == "__def__":
+            #     ShaderManager.set_shader("__def__")
+            #     ShaderManager.set_uniform_value("u_texture", "1i", 0)
 
             if cls.debug:
                 Testing.cummulation_start()

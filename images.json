@@ -1,4 +1,7 @@
 {
-    "player": "resources\\churchwall.png",
+    "player": "resources\\player_body.png",
+    "wall": "resources\\churchwall.png",
+    "pillar": "resources\\frontlane.png",
+    "front_pillar": "resources\\frontline.png",
     "floor": "resources\\floor.png"
 }
