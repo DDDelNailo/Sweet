@@ -105,8 +105,9 @@ class GameLoop:
         ShaderManager.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
         BASE_DIR = Path(__file__).resolve().parent
         BUILD = BASE_DIR / "build"
+        ShaderManager.add_shader("a", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
+        ShaderManager.add_shader("b", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
         ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
-        ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
         # ShaderManager.build_shaders()
         ShaderManager.set_shader("__def__")
         cls._built = True

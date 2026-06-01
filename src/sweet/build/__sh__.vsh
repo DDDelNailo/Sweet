@@ -5,6 +5,7 @@ layout(location = 1) in vec2 a_texcoord;
 layout(location = 2) in mat4 model;
 layout(location = 6) in mat4 projection;
 layout(location = 10) in vec4 iUV;
+layout(location = 11) in vec4 iColor;
 
 layout(std140, binding = 0) uniform Camera
 {
@@ -12,6 +13,7 @@ layout(std140, binding = 0) uniform Camera
 };
 
 out vec2 v_texcoord;
+out vec4 v_color;
 
 void main()
 {
@@ -25,4 +27,5 @@ void main()
     vec2 flipped_a_texcoord = vec2(a_texcoord.x, 1.0 - a_texcoord.y);
     vec2 uv = flipped_a_texcoord * iUV.zw + iUV.xy;
     v_texcoord = uv;
+    v_color = iColor;
 }

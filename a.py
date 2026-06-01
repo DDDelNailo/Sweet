@@ -71,7 +71,7 @@ class test(sw.Entity):
         self.camera_angle.y += mouse_dy * .2
         self.camera_angle.y = min(89.9, max(-89.9, self.camera_angle.y))
 
-        self.camera_angle = Vec3(0, 0, 0)
+        # self.camera_angle = Vec3(0, 0, 0)
         main_cam.angles = self.camera_angle
 
         if self.mouse_x == 0 or self.mouse_x == screen_size[0] - 1:
@@ -82,18 +82,53 @@ class test(sw.Entity):
             self.mouse_y = screen_size[1] // 2
 
     def draw(self):
-        floor = sw.Textures.get("floor")
-        wall = sw.Textures.get("wall")
-        pillar = sw.Textures.get("pillar")
-        front_pillar = sw.Textures.get("front_pillar")
-        sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 1), Vec3(90, 0, 0), perspective=self.perspective)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(wall, Vec3(wall.get_width() * i, wall.get_height() // 2, 0), Vec3(wall.get_width(), wall.get_height(), 1), self.angle, perspective=self.perspective)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(pillar, Vec3(pillar.get_width() * i, pillar.get_height() // 2, 50), Vec3(pillar.get_width(), pillar.get_height(), 1), self.angle, perspective=self.perspective)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(front_pillar, Vec3(400 * i, 0, 170), Vec3(front_pillar.get_width(), front_pillar.get_height(), 1), self.angle, perspective=self.perspective)
-        
+        for i in range(20):
+            for j in range(20):
+                for k in range(-10, 3):
+                    draw_block((i, k, j), ("grass_block_top.png", "grass_block_side.png", "grass_block_side.png", "grass_block_side.png", "grass_block_side.png", "dirt.png"))
+
+block_state = {}
+def draw_block(coordinates, textures):
+
+    block_state[coordinates] = 1
+    size = 10
+    coordinates_use = Vec3(*coordinates) * size
+    angle = [
+        Vec3(90, 0, 0),
+        Vec3(0, 90, 0),
+        Vec3(0, 180, 0),
+        Vec3(0, 270, 0),
+        Vec3(0, 0, 0),
+        Vec3(90, 0, 0),
+    ]
+    position = [
+        Vec3(0, size / 2, 0),
+        Vec3(size / 2, 0, 0),
+        Vec3(0, 0, size / 2),
+        Vec3(-size / 2, 0, 0),
+        Vec3(0, 0, -size / 2),
+        Vec3(0, -size / 2, 0),
+    ]
+    face_offset = [
+        Vec3(0,1,0),
+        Vec3(1,0,0),
+        Vec3(0,0,1),
+        Vec3(-1,0,0),
+        Vec3(0,0,-1),
+        Vec3(0,-1,0),
+    ]
+
+    for i, texture in enumerate(textures):
+        point = Vec3(*coordinates) + face_offset[i]
+        if block_state.get((point.x, point.y, point.z)) == None:
+            image = sw.graphics.texture.Texture.get_texture(texture.split(".")[0])
+            if image == None:
+                image = sw.graphics.texture.Texture.set_texture(texture.split(".")[0], Path.cwd() / "resources" / "block" / texture)
+
+            sw.entity.Draw.draw_image(image, coordinates_use + position[i], Vec3(size, size, 1), angle[i], (122, 189, 106, 255) if texture == "grass_block_top.png" else (255,255, 255, 255))
+    
+
+
 test()
 
 sw.run()

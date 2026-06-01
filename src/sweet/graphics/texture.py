@@ -74,7 +74,7 @@ class Texture:
 
     @classmethod
     def get_texture(cls, name: str) -> "Imaging | Video":
-        return cls._textures[name]
+        return cls._textures.get(name)
     
     @classmethod
     def delete_texture(cls, name: str) -> None:
