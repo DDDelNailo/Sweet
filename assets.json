@@ -3,5 +3,7 @@
     "wall": "resources\\churchwall.png",
     "pillar": "resources\\frontlane.png",
     "front_pillar": "resources\\frontline.png",
-    "floor": "resources\\floor.png"
+    "floor": "resources\\floor.png",
+    "plane": "resources\\Airplane Texture.png",
+    "pixel": "resources\\build\\pixel.png"
 }

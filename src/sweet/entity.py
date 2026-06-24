@@ -295,10 +295,14 @@ class Draw:
     @classmethod
     def set_state_shader(cls, name: str) -> None:
         cls._state_shader = name
+        cls.clear_state_shader()
+
+    @classmethod
+    def clear_state_shader(cls):
+        cls._state_attr = {}
 
     @classmethod
     def set_shader_attr(cls, name: str, *values: int | float) -> None:
-        
         cls._state_attr[name] = values
 
     @classmethod

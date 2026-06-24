@@ -8,7 +8,6 @@ src/sweet/inputting.py
 src/sweet/looping.py
 src/sweet/path_solver.py
 src/sweet/sound.py
-src/sweet/testing.py
 src/sweet/vector.py
 src/sweet.egg-info/PKG-INFO
 src/sweet.egg-info/SOURCES.txt

@@ -1,3 +1,4 @@
+import trimesh
 from ..common import ConvertType, Rec, UVLocation, Sprite
 import pygame as pg
 import OpenGL.GL as gl
@@ -32,11 +33,12 @@ class BufferLayout:
 @dataclass
 class VertexArrayState:
     vao: int
-    quad_vbo: int
+    geometry_vbo: int
     instance_vbo: int | None
     ebo: int | None
+    index_count: int | None
 
-    quad_layout: BufferLayout
+    geometry_layout: BufferLayout
     instance_layout: BufferLayout | None
 
 @dataclass
@@ -70,6 +72,38 @@ class StorageBlock:
 class ShaderResources:
     ubos: dict[str, UniformBlock]
     ssbos: dict[str, StorageBlock]
+
+@dataclass
+class Geometry:
+    vbo_data: np.ndarray
+    ebo_data: np.ndarray
+    index_count: int
+
+class Models:
+    @staticmethod
+    def load_model(file_path: str | Path) -> Geometry:
+        normal_path = solve_path(file_path)
+        mesh = trimesh.load(normal_path) # type: ignore
+        
+        if isinstance(mesh, trimesh.Scene):
+            mesh = mesh.dump(concatenate=True)
+
+        vertices = mesh.vertices.astype(np.float32) # type: ignore
+        normals = mesh.vertex_normals.astype(np.float32) # type: ignore
+        faces = mesh.faces.astype(np.uint32) # type: ignore
+
+        if hasattr(mesh.visual, 'uv') and mesh.visual.uv is not None: # type: ignore
+            uvs = mesh.visual.uv.astype(np.float32) # type: ignore
+        else:
+            uvs = np.zeros((len(vertices), 2), dtype=np.float32)
+
+        interleaved_data = np.hstack((vertices, uvs, normals)).astype(np.float32)
+
+        vbo_data = interleaved_data.flatten()
+        ebo_data = faces.flatten() # type: ignore
+        index_count = len(ebo_data)
+
+        return Geometry(vbo_data=vbo_data, ebo_data=ebo_data, index_count=index_count) # type: ignore
 
 class Atlas:
     def __init__(self, width: int, height: int, occupation: str, padding: int=0) -> None:
@@ -529,10 +563,12 @@ class ShaderManager:
 
     @classmethod
     def build_shader(cls, shader: Shader) -> None:
+        gmt = Models.load_model("C:\\Users\\xgabr\\OneDrive\\Área de Trabalho\\Sweet\\resources\\faive.obj")
+        
         if shader.built == False:
             vertex, fragment = shader.vertex, shader.fragment
             shader.set_program(cls.compile_shader(vertex, fragment))
-            cls.build_buffers(shader)
+            cls.build_buffers(shader, gmt)
 
     @classmethod
     def build_all_shaders(cls) -> None:
@@ -639,15 +675,15 @@ class ShaderManager:
         instance_buffer = None
         MAX_SPRITES = 32768
 
-        count = gl.glGetProgramiv(program, gl.GL_ACTIVE_ATTRIBUTES) # type: ignore
-        if count > 2:
+        count = len(locations)
+        if count >= 1:
             instance_attributes: list[Attribute] = []
 
             instance_vbo = gl.glGenBuffers(1) # type: ignore
             gl.glBindBuffer(gl.GL_ARRAY_BUFFER, instance_vbo) # type: ignore
 
             total_floats = 0
-            for i in range(2, count):
+            for i in range(count):
                 lookup_i = locations[i]
                 loc_map = location_map.get(lookup_i)
 
@@ -662,7 +698,7 @@ class ShaderManager:
             gl.glBufferData(gl.GL_ARRAY_BUFFER, MAX_SPRITES * instance_stride, None, gl.GL_DYNAMIC_DRAW) # type: ignore
             
             offset = 0
-            for i in range(2, count):
+            for i in range(count):
                 lookup_i = locations[i]
                 loc_map = location_map.get(lookup_i)
 
@@ -692,23 +728,34 @@ class ShaderManager:
         return instance_vbo, instance_buffer # type: ignore
 
     @classmethod
-    def reflect_quad_attributes(cls, program: int, location_map: dict[int, int]) -> tuple[int, BufferLayout]:
-        vertices = np.array([
-            -0.5, -0.5,  0.0,   0,  0,
-             0.5, -0.5,  0.0,   1,  0,
-             0.5,  0.5,  0.0,   1,  1,
-            -0.5,  0.5,  0.0,   0,  1,
+    def reflect_geometry_attributes(cls, program: int, geometry: Geometry | None, location_map: dict[int, int], locations: list[int]) -> tuple[int, BufferLayout]:
+        if geometry == None:
+            vertices = np.array([
+            # Front Face (Normal points straight out on Z axis: 0.0, 0.0, 1.0)
+            -1.0, -1.0,  1.0,  0.0, 0.0,   0.0,  0.0,  1.0, 
+            1.0, -1.0,  1.0,  1.0, 0.0,   0.0,  0.0,  1.0, 
+            1.0,  1.0,  1.0,  1.0, 1.0,   0.0,  0.0,  1.0, 
+            -1.0,  1.0,  1.0,  0.0, 1.0,   0.0,  0.0,  1.0, 
+            
+            # Back Face (Normal points backwards on Z axis: 0.0, 0.0, -1.0)
+            -1.0, -1.0, -1.0,  1.0, 0.0,   0.0,  0.0, -1.0, 
+            1.0, -1.0, -1.0,  0.0, 0.0,   0.0,  0.0, -1.0, 
+            1.0,  1.0, -1.0,  0.0, 1.0,   0.0,  0.0, -1.0, 
+            -1.0,  1.0, -1.0,  1.0, 1.0,   0.0,  0.0, -1.0, 
         ], dtype=np.float32)
+        else:
+            vertices = geometry.vbo_data
 
-        quad_attributes: list[Attribute] = []
+        geometry_attributes: list[Attribute] = []
 
-        quad_vbo = gl.glGenBuffers(1) # type: ignore
-        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, quad_vbo) # type: ignore
-        vertex_stride = 5 * vertices.itemsize
+        geometry_vbo = gl.glGenBuffers(1) # type: ignore
+        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, geometry_vbo) # type: ignore
+        vertex_stride = 8 * vertices.itemsize
         gl.glBufferData(gl.GL_ARRAY_BUFFER, vertices.nbytes, vertices, gl.GL_STATIC_DRAW) # type: ignore
 
         offset = 0
-        for i in range(2):
+        count = len(locations)
+        for i in range(count):
             loc_map = location_map.get(i)
             if loc_map is None:
                 raise ValueError(f"Atributo {i} não possui correspondente adequado.")
@@ -716,57 +763,79 @@ class ShaderManager:
             name_str = name.decode()
             location = gl.glGetAttribLocation(program, name_str)
             floats = cls._GL_TYPE_SIZES[gl_type]
-            quad_attributes.append(Attribute(name_str, location, size, floats, offset))
+            geometry_attributes.append(Attribute(name_str, location, size, floats, offset))
+
             gl.glEnableVertexAttribArray(location) # type: ignore
             gl.glVertexAttribPointer(location, floats, gl.GL_FLOAT, gl.GL_FALSE, vertex_stride, ctypes.c_void_p(offset)) # type: ignore
             gl.glVertexAttribDivisor(location, 0) # type: ignore
 
             offset += floats * 4
 
-        quad_buffer = BufferLayout(vertex_stride, quad_attributes)
-        return quad_vbo, quad_buffer # type: ignore
+        geometry_buffer = BufferLayout(vertex_stride, geometry_attributes)
+        return geometry_vbo, geometry_buffer # type: ignore
 
     @staticmethod
-    def reflect_ebo() -> int:
-        indices = np.array([
-            0, 1, 2,
-            2, 3, 0
-        ], dtype=np.uint32)
+    def reflect_ebo(geometry: Geometry | None) -> tuple[int, int]:
+        index_count: int
+        if geometry == None:
+            indices = np.array([
+                0, 1, 2,  2, 3, 0, # Front
+                1, 5, 6,  6, 2, 1, # Right
+                5, 4, 7,  7, 6, 5, # Back
+                4, 0, 3,  3, 7, 4, # Left
+                3, 2, 6,  6, 7, 3, # Top
+                4, 5, 1,  1, 0, 4, # Bottom
+            ], dtype=np.uint32)
+            index_count = 36
+        else:
+            indices = geometry.ebo_data
+            index_count = geometry.index_count
 
         ebo = gl.glGenBuffers(1) # type: ignore
         gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, ebo) # type: ignore
         gl.glBufferData(gl.GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, gl.GL_STATIC_DRAW) # type: ignore
 
-        return ebo # type: ignore
-
-    @classmethod
-    def build_buffers(cls, shader: Shader) -> object:
-        program = shader.program
-        gl.glUseProgram(program) # type: ignore
-
-        vao = gl.glGenVertexArrays(1) # type: ignore
-        gl.glBindVertexArray(vao) # type: ignore
-
-        ebo = cls.reflect_ebo()
-
+        return ebo, index_count # type: ignore
+    
+    @staticmethod
+    def generate_vao_locations(program: int) -> tuple[dict[int, int], list[int], list[int]]:
         location_map: dict[int, int] = {}
-        locations: list[int] = []
+        geometry_locations: list[int] = []
+        instance_locations: list[int] = []
         count: int = gl.glGetProgramiv(program, gl.GL_ACTIVE_ATTRIBUTES) # type: ignore
         for i in range(count):
             name, _, _ = gl.glGetActiveAttrib(program, i)
             name_str = name.decode()
             location = gl.glGetAttribLocation(program, name_str)
             location_map[location] = i
-            locations.append(location)
-        locations.sort()
+            if name[:2]==b'a_':
+                geometry_locations.append(location)
+            else:
+                instance_locations.append(location)
 
-        quad_vbo, quad_buffer = cls.reflect_quad_attributes(program, location_map)
-        instance_vbo, instance_buffer = cls.reflect_instance_attributes(program, location_map, locations)
+        geometry_locations.sort()
+        instance_locations.sort()
+
+        return location_map, geometry_locations, instance_locations
+
+    @classmethod
+    def build_buffers(cls, shader: Shader, geometry: Geometry | None = None) -> object:
+        program = shader.program
+        gl.glUseProgram(program) # type: ignore
+
+        vao = gl.glGenVertexArrays(1) # type: ignore
+        gl.glBindVertexArray(vao) # type: ignore
+
+        ebo, index_count = cls.reflect_ebo(geometry)
+
+        location_map, geometry_locations, instance_locations = cls.generate_vao_locations(program)
+
+        geometry_vbo, geometry_buffer = cls.reflect_geometry_attributes(program, geometry, location_map, geometry_locations)
+        instance_vbo, instance_buffer = cls.reflect_instance_attributes(program, location_map, instance_locations)
         ubos = cls.reflect_ubos(program)
         ssbos = {"a": StorageBlock("", -1, 0, -1)}#cls.reflect_ssbos(program)
 
-
-        vertex_state = VertexArrayState(vao, quad_vbo, instance_vbo, ebo, quad_buffer, instance_buffer)
+        vertex_state = VertexArrayState(vao, geometry_vbo, instance_vbo, ebo, index_count, geometry_buffer, instance_buffer)
         resources = ShaderResources(ubos, ssbos)
         shader.set_state(vertex_state, resources)
         shader.built = True
@@ -855,6 +924,7 @@ class ShaderRender:
     @classmethod
     def render_batch(cls, texture: int, data: NDArray[np.uint8], count: int, view: np.ndarray, unit=gl.GL_TEXTURE0) -> None: # type: ignore
         shaders = ShaderManager.get_current_shader()
+        
         ubo = shaders.resources.ubos["Camera"].buffer_id
 
         vao = shaders.vertex_state.vao
@@ -877,15 +947,18 @@ class ShaderRender:
         gl.glActiveTexture(unit) # type: ignore
         gl.glBindTexture(gl.GL_TEXTURE_2D, texture) # type: ignore
 
-        # glEnable(GL_DEPTH_TEST)
-        # glDepthMask(GL_TRUE)
+        gl.glEnable(gl.GL_DEPTH_TEST) # type: ignore
+        gl.glDepthMask(gl.GL_TRUE) # type: ignore
         # glDisable(GL_BLEND)
 
         # glDepthMask(GL_FALSE)
 
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, instance_vbo) # type: ignore
 
-        gl.glDrawElementsInstanced(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, None, count) # type: ignore
+        index_count = shaders.vertex_state.index_count
+        gl.glDrawElementsInstanced(gl.GL_TRIANGLES, index_count, gl.GL_UNSIGNED_INT, None, count) # type: ignore
+
+        gl.glBindVertexArray(0) # type: ignore
 
     @staticmethod
     def euler_view_mat(pitch: float, yaw: float, roll: float):

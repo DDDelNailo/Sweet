@@ -83,20 +83,15 @@ class test(sw.Entity):
             self.mouse_y = screen_size[1] // 2
 
     def draw(self):
-        floor = sw.Textures.get("floor")
-        wall = sw.Textures.get("wall")
-        pillar = sw.Textures.get("pillar")
-        front_pillar = sw.Textures.get("front_pillar")
-        sw.Display.set_shader("__def__")
-        sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 1), Vec3(90, 0, 0), perspective=self.perspective)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(wall, Vec3(wall.get_width() * i, wall.get_height() // 2, 0), Vec3(wall.get_width(), wall.get_height(), 1), self.angle, perspective=self.perspective)
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(pillar, Vec3(pillar.get_width() * i, pillar.get_height() // 2, 50), Vec3(pillar.get_width(), pillar.get_height(), 1), self.angle, perspective=self.perspective)
-        sw.Display.set_shader("game")
-        for i in range(-15, 15):
-            sw.entity.Draw.draw_image(front_pillar, Vec3(400 * i, 0, 170), Vec3(front_pillar.get_width(), front_pillar.get_height(), 1), self.angle, perspective=self.perspective)
-        sw.Display.set_shader("__def__")
+        # pillar = sw.Textures.get("pillar")
+        front_pillar = sw.Textures.get("plane")
+        # sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 1), Vec3(90, 0, 0), perspective=self.perspective)
+        # for i in range(0, 1):
+        #     sw.entity.Draw.draw_image(wall, Vec3(wall.get_width() * i, wall.get_height() // 2, 0), Vec3(wall.get_width(), wall.get_height(), 1), self.angle, perspective=self.perspective)
+        # for i in range(0, 1):
+        #     sw.entity.Draw.draw_image(pillar, Vec3(pillar.get_width() * i, pillar.get_height() // 2, 50), Vec3(pillar.get_width(), pillar.get_height(), 1), self.angle, perspective=self.perspective)
+        for i in range(0, 1):
+            sw.entity.Draw.draw_image(front_pillar, Vec3(400 * i, 0, 170), Vec3(10, 10, 10), self.angle, perspective=self.perspective)
 
 test()
 # sw.Scene.create(test)
