@@ -839,7 +839,7 @@ class ShaderRender:
             glm.radians(cls._fov), # type: ignore
             width / height,
             0.1,
-            10000.0
+            100000.0
         )
         cls._PROJECTIONS["orthogonal"] = glm.ortho( # type: ignore
             -width / 100, width / 100,
@@ -868,12 +868,6 @@ class ShaderRender:
             view.nbytes,
             view
         )
-        # glBufferSubData(
-        #     GL_UNIFORM_BUFFER,
-        #     64,
-        #     8,
-        #     np.array([0, .2], dtype=np.float32)
-        # )
         
         instance_vbo = shaders.vertex_state.instance_vbo
         if instance_vbo is not None:
@@ -995,6 +989,8 @@ class ShaderRender:
                         data.extend(projection[column])
                 elif attr.name == "iUV":
                     data.extend([u0, v0, us, vs])
+                elif attr.name == "iColor":
+                    data.extend(s.color)
                 else:
                     values = s.attrs[attr.name]
                     data.extend([*values])
