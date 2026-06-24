@@ -1,1 +1,1 @@
-from . import UI, shaders, texture
+from . import UI, shaders, texture # type: ignore

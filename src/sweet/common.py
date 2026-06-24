@@ -1,8 +1,6 @@
-from typing import TypeAlias, Sequence
 from enum import Enum, auto
-import pygame as pg
-from PIL import Image
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from .vector import Vec2
 
 class FileType(Enum):
     STREAM = auto()
@@ -31,13 +29,6 @@ class Interpolation(Enum):
     QUAD = auto()
     NONE = auto()
 
-Drawing: TypeAlias = pg.Surface | Image.Image | int
-TextureData: TypeAlias = dict[Drawing, int, int]
-AtlasTexture: TypeAlias = dict[int, int, int]
-Vector: TypeAlias = list[int, int]
-Controls: TypeAlias = Sequence[Vector] | Sequence[list[Vector, Vector, Vector]]
-Group: TypeAlias = Sequence | type | object
-
 @dataclass
 class Rec:
     x: int
@@ -47,27 +38,27 @@ class Rec:
 
 @dataclass
 class UVLocation:
-    tex_id: int = ""
-    uv: Rec = None
+    tex_id: int = -1
+    uv: Rec = field(default_factory=lambda: Rec(0, 0, 0, 0))
 
 @dataclass
 class CollisionData:
-    mtv: int
-    normal: Vector
+    mtv: Vec2
+    normal: Vec2
     is_b: bool
-    contact_point: Vector
+    contact_point: Vec2
     entity: object
 
 @dataclass
 class Sprite:
     texture_id: int
-    uv: tuple
-    pos: tuple
-    scale: tuple
-    rotation: tuple
-    color: tuple
+    uv: Rec
+    pos: tuple[float, float, float]
+    scale: tuple[float, float, float]
+    rotation: tuple[float, float, float]
+    color: tuple[float, float, float, float]
     perspective: bool
     static: bool
-    shader: bool
-    attrs: dict
+    shader: str
+    attrs: dict[str, tuple[int | float, ...]]
     unit: int

@@ -1,24 +1,27 @@
 from math import cos, radians, sin, degrees, atan2, pi
+from collections.abc import Iterator
 from typing import Sequence
-from numbers import Real
 
 class VecN:
-    def __init__(self, values: Sequence[Real]) -> None:
+    def __init__(self, values: Sequence[float] | float) -> None:
+        if isinstance(values, (int, float)):
+            values = [values]
         self.scalars = values
 
-    def magnitude(self) -> Real:
+    def magnitude(self) -> float:
         return sum(map(lambda scalar: scalar ** 2, self.scalars)) ** .5
 
-    def magnitude_squared(self) -> Real:
+    def magnitude_squared(self) -> float:
         return sum(map(lambda scalar: scalar ** 2, self.scalars))
 
     def normalize(self) -> "VecN":
-        magnitude: Real = self.magnitude()
+        magnitude: float = self.magnitude()
         return VecN(*map(lambda scalar: scalar / magnitude, self.scalars))
     
-    def dot(self, other: "VecN") -> Real:
-        products: list[Real] = [self.scalars[i] * other.scalars[i] for i in range(len(self.scalars))]
-        return sum(products)
+    def dot(self, other: "VecN" | Sequence[int | float]) -> float:
+        if isinstance(other, list | tuple | Sequence):
+            return sum([self.scalars[i] * other[i] for i in range(len(self.scalars))])
+        return sum([self.scalars[i] * other.scalars[i] for i in range(len(self.scalars))])
 
     def floor(self) -> "VecN":
         return VecN(list(map(lambda scalar: round(scalar), self.scalars)))
@@ -26,59 +29,64 @@ class VecN:
     def round(self) -> "VecN":
         return VecN(list(map(lambda scalar: round(scalar), self.scalars)))
     
-    def min(self, value: Real) -> "VecN":
+    def min(self, value: float) -> "VecN":
         return VecN(list(map(lambda scalar: min(scalar, value), self.scalars)))
 
-    def max(self, value: Real) -> "VecN":
+    def max(self, value: float) -> "VecN":
         return VecN(list(map(lambda scalar: max(scalar, value), self.scalars)))
 
-    def clamp(self, minimum: Real, maximum: Real) -> "VecN":
+    def clamp(self, minimum: float, maximum: float) -> "VecN":
         return VecN(list(map(lambda scalar: max(minimum, min(scalar, maximum)), self.scalars)))
     
-    def lerp(self, other, t) -> "VecN":
+    def lerp(self, other: "VecN | Sequence[int]", t: float) -> "VecN":
         if isinstance(other, VecN):
-            scalars: list[Real] = [self.scalars[i] * (1 - t) + other.scalars[i] * t for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] * (1 - t) + other.scalars[i] * t for i in range(len(self.scalars))]
         else:
-            scalars: list[Real] = [self.scalars[i] * (1 - t) + other[i] * t for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] * (1 - t) + other[i] * t for i in range(len(self.scalars))]
         return VecN(scalars)
     
-    def __add__(self, other) -> "VecN":
+    def __add__(self, other: "VecN | Sequence[int | float]") -> "VecN":
         if isinstance(other, VecN):
-            scalars: list[Real] = [self.scalars[i] + other.scalars[i] for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] + other.scalars[i] for i in range(len(self.scalars))]
         else:
-            scalars: list[Real] = [self.scalars[i] + other[i] for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] + other[i] for i in range(len(self.scalars))]
         return VecN(scalars)
 
     def __neg__(self) -> "VecN":
         return VecN(*map(lambda x: -x, self.scalars))
 
-    def __sub__(self, other) -> "VecN":
+    def __sub__(self, other: "VecN | Sequence[int | float]") -> "VecN":
         if isinstance(other, VecN):
-            scalars: list[Real] = [self.scalars[i] - other.scalars[i] for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] - other.scalars[i] for i in range(len(self.scalars))]
         else:
-            scalars: list[Real] = [self.scalars[i] - other[i] for i in range(len(self.scalars))]
+            scalars: list[float] = [self.scalars[i] - other[i] for i in range(len(self.scalars))]
         return VecN(scalars)
 
-    def __mul__(self, other) -> "VecN":
-        scalars: list[Real] = [self.scalars[i] * other for i in range(len(self.scalars))]
+    def __mul__(self, other: "VecN | Sequence[int | float] | int | float") -> "VecN | float":
+        if isinstance(other, int | float):
+            return VecN([self.scalars[i] * other for i in range(len(self.scalars))])
+        return sum(self.scalars[i] * other[i] for i in range(len(self.scalars)))
+
+    def __rmul__(self, other: "VecN | Sequence[int | float] | int | float") -> "VecN | float":
+        if isinstance(other, int | float):
+            return VecN([self.scalars[i] * other for i in range(len(self.scalars))])
+        return sum(self.scalars[i] * other[i] for i in range(len(self.scalars)))
+    
+    def __truediv__(self, other: int | float) -> "VecN":
+        scalars: list[float] = [self.scalars[i] / other for i in range(len(self.scalars))]
         return VecN(scalars)
 
-    def __rmul__(self, other) -> "VecN":
-        scalars: list[Real] = [self.scalars[i] * other for i in range(len(self.scalars))]
+    def __floordiv__(self, other: int | float) -> "VecN":
+        scalars: list[float] = [self.scalars[i] // other for i in range(len(self.scalars))]
         return VecN(scalars)
     
-    def __truediv__(self, other) -> "VecN":
-        scalars: list[Real] = [self.scalars[i] / other for i in range(len(self.scalars))]
-        return VecN(scalars)
+    def __iter__(self) -> Iterator[float]:
+        yield from self.scalars
 
-    def __floordiv__(self, other) -> "VecN":
-        scalars: list[Real] = [self.scalars[i] // other for i in range(len(self.scalars))]
-        return VecN(scalars)
-    
-    def unp(self) -> tuple[Real, Real]:
+    def unp(self) -> tuple[float, ...]:
         return tuple(self.scalars)
     
-    def __getitem__(self, index: int) -> Real:
+    def __getitem__(self, index: int) -> float:
         if index > len(self.scalars) or index < 0:
             raise ValueError("Index fora da lista.")
         return self.scalars[index]
@@ -87,37 +95,41 @@ class VecN:
         return f'[{self.scalars}]'
 
 class Vec2:
-    def __init__(self, x: Real, y: Real) -> None:
+    def __init__(self, x: float, y: float) -> None:
         self.x = x
         self.y = y
 
-    def angle(self) -> Real:
-        ang: Real = degrees(atan2(self.y, self.x))
+    def angle(self) -> float:
+        ang: float = degrees(atan2(self.y, self.x))
         if ang < 0:
             ang += 360
         return ang
 
-    def rotate(self, angle: Real) -> "Vec2":
+    def rotate(self, angle: float) -> "Vec2":
         return Vec2(self.x * cos(angle * pi / 180) - self.y * sin(angle * pi / 180),
                     self.x * sin(angle * pi / 180) + self.y * cos(angle * pi / 180))
     
     def rotate90(self) -> "Vec2":
         return Vec2(self.y, -self.x)
     
-    def magnitude(self) -> "Vec2":
+    def magnitude(self) -> float:
         return (self.x ** 2 + self.y ** 2) ** .5
 
-    def magnitude_squared(self) -> "Vec2":
+    def magnitude_squared(self) -> float:
         return self.x ** 2 + self.y ** 2
 
     def normalize(self) -> "Vec2":
-        magnitude: Real = self.magnitude()
+        magnitude: float = self.magnitude()
         return Vec2(self.x / magnitude, self.y / magnitude)
     
-    def dot(self, other) -> Real:
+    def dot(self, other: "Vec2 | Sequence[int | float]") -> float:
+        if isinstance(other, list | tuple | Sequence):
+            return self.x * other[0] + self.y * other[1]
         return self.x * other.x + self.y * other.y
     
-    def cross(self, other) -> Real:
+    def cross(self, other: "Vec2 | Sequence[int | float]") -> float:
+        if isinstance(other, list | tuple | Sequence):
+            return self.x * other[1] - self.y * other[0]
         return self.x * other.y - self.y * other.x
 
     def mirror_x(self) -> "Vec2":
@@ -132,16 +144,16 @@ class Vec2:
     def round(self) -> "Vec2":
         return Vec2(round(self.x), round(self.y))
     
-    def min(self, value: Real) -> "Vec2":
+    def min(self, value: float) -> "Vec2":
         return Vec2(min(self.x, value), min(self.y, value))
 
-    def max(self, value: Real) -> "Vec2":
+    def max(self, value: float) -> "Vec2":
         return Vec2(max(self.x, value), max(self.y, value))
 
-    def clamp(self, minimum: Real, maximum: Real) -> "Vec2":
+    def clamp(self, minimum: float, maximum: float) -> "Vec2":
         return Vec2(max(min(self.x, maximum), minimum), max(min(self.y, maximum), minimum))
 
-    def __add__(self, other) -> "Vec2":
+    def __add__(self, other: "Vec2 | Sequence[int| float]") -> "Vec2":
         if isinstance(other, Vec2):
             return Vec2(self.x + other.x, self.y + other.y)
         return Vec2(self.x + other[0], self.y + other[1])
@@ -149,28 +161,37 @@ class Vec2:
     def __neg__(self) -> "Vec2":
         return Vec2(-self.x, -self.y)
 
-    def __sub__(self, other) -> "Vec2":
+    def __sub__(self, other: "Vec2 | Sequence[int| float]") -> "Vec2":
         if isinstance(other, Vec2):
             return Vec2(self.x - other.x, self.y - other.y)
         return Vec2(self.x + other[0], self.y + other[1])
 
-    def __mul__(self, other) -> "Vec2":
-        return Vec2(self.x * other, self.y * other)
+    def __mul__(self, other: "Vec2 | Sequence[int | float] | int | float") -> "Vec2 | float":
+        if isinstance(other, int | float):
+            return Vec2(self.x * other, self.y * other)
 
-    def __rmul__(self, other) -> "Vec2":
-        return Vec2(self.x * other, self.y * other)
+        return self.dot(other)
+
+    def __rmul__(self, other: "Vec2 | Sequence[int | float] | int | float") -> "Vec2 | float":
+        if isinstance(other, int | float):
+            return Vec2(self.x * other, self.y * other)
+
+        return self.dot(other)
     
-    def __truediv__(self, other) -> "Vec2":
+    def __truediv__(self, other: int | float) -> "Vec2":
         return Vec2(self.x / other, self.y / other)
 
-    def __floordiv__(self, other) -> "Vec2":
+    def __floordiv__(self, other: int | float) -> "Vec2":
         return Vec2(self.x // other, self.y // other)
     
     def __iter__(self):
         yield self.x
         yield self.y
+
+    def unp(self) -> tuple[float, float]:
+        return (self.x, self.y)
     
-    def __getitem__(self, index: int) -> Real:
+    def __getitem__(self, index: int) -> float:
         if index > 1 or index < 0:
             raise ValueError("Index fora da lista.")
         return self.x if index == 0 else self.y
@@ -180,7 +201,7 @@ class Vec2:
     
 
 class Vec3:
-    def __init__(self, x: Real, y: Real, z: Real) -> None:
+    def __init__(self, x: float, y: float, z: float) -> None:
         self.x = x
         self.y = y
         self.z = z
@@ -191,33 +212,29 @@ class Vec3:
             sin(radians(self.y)),
             cos(radians(self.x)) * cos(radians(self.y)),
         )
-        return vec
-    # def angle(self) -> Real:
-    #     ang: Real = degrees(atan2(self.y, self.x))
-    #     if ang < 0:
-    #         ang += 360
-    #     return ang
 
-    # def rotate(self, angle: Real) -> "Vec3":
-    #     return Vec3(self.x * cos(angle * pi / 180) - self.y * sin(angle * pi / 180),
-    #                 self.x * sin(angle * pi / 180) + self.y * cos(angle * pi / 180), self.z)
-    # def rotate90(self) -> "Vec3":
-    #     return Vec3(self.y, -self.x, self.z)
+        return vec
     
-    def magnitude(self) -> "Vec3":
+    def magnitude(self) -> float:
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** .5
 
-    def magnitude_squared(self) -> "Vec3":
+    def magnitude_squared(self) -> float:
         return self.x ** 2 + self.y ** 2 + self.z ** 2
 
     def normalize(self) -> "Vec3":
-        magnitude: Real = self.magnitude()
+        magnitude: float = self.magnitude()
         return Vec3(self.x / magnitude, self.y / magnitude, self.z / magnitude)
 
-    def dot(self, other) -> Real:
+    def dot(self, other: "Vec3" | Sequence[int | float]) -> float:
+        if isinstance(other, list | tuple | Sequence):
+            return self.x * other[0] + self.y * other[1] + self.z * other[2]
         return self.x * other.x + self.y * other.y + self.z * other.z
     
-    def cross(self, other) -> "Vec3":
+    def cross(self, other: "Vec3" | Sequence[int | float]) -> "Vec3":
+        if isinstance(other, list | tuple | Sequence):
+            return Vec3(self.x * other[1] - self.y * other[0],
+                    self.x * other[2] - self.z * other[0],
+                    self.y * other[2] - self.z * other[1])
         return Vec3(self.x * other.y - self.y * other.x,
                     self.x * other.z - self.z * other.x,
                     self.y * other.z - self.z * other.y)
@@ -228,16 +245,16 @@ class Vec3:
     def round(self) -> "Vec3":
         return Vec3(round(self.x), round(self.y), round(self.z))
 
-    def min(self, value: Real) -> "Vec3":
+    def min(self, value: float) -> "Vec3":
         return Vec3(min(self.x, value), min(self.y, value), min(self.z, value))
 
-    def max(self, value: Real) -> "Vec3":
+    def max(self, value: float) -> "Vec3":
         return Vec3(max(self.x, value), max(self.y, value), max(self.z, value))
 
-    def clamp(self, minimum: Real, maximum: Real) -> "Vec3":
+    def clamp(self, minimum: float, maximum: float) -> "Vec3":
         return Vec3(max(min(self.x, maximum), minimum), max(min(self.y, maximum), minimum), max(min(self.z, maximum), minimum))
 
-    def __add__(self, other) -> "Vec3":
+    def __add__(self, other: "Vec3" | Sequence[int | float]) -> "Vec3":
         if isinstance(other, Vec3):
             return Vec3(self.x + other.x, self.y + other.y, self.z + other.z)
         return Vec3(self.x + other[0], self.y + other[1], self.z + other[2])
@@ -245,21 +262,27 @@ class Vec3:
     def __neg__(self) -> "Vec3":
         return Vec3(-self.x, -self.y, -self.z)
 
-    def __sub__(self, other) -> "Vec3":
+    def __sub__(self, other: "Vec3" | Sequence[int | float]) -> "Vec3":
         if isinstance(other, Vec3):
             return Vec3(self.x - other.x, self.y - other.y, self.z - other.z)
         return Vec3(self.x + other[0], self.y + other[1], self.z + other[2])
 
-    def __mul__(self, other) -> "Vec3":
-        return Vec3(self.x * other, self.y * other, self.z * other)
+    def __mul__(self, other: "Vec3" | Sequence[int | float] | int | float) -> "Vec3 | float":
+        if isinstance(other, int | float):
+            return Vec3(self.x * other, self.y * other, self.z * other)
+        
+        return self.dot(other)
 
-    def __rmul__(self, other) -> "Vec3":
-        return Vec3(self.x * other, self.y * other, self.z * other)
+    def __rmul__(self, other: "Vec3" | Sequence[int | float] | int | float) -> "Vec3 | float":
+        if isinstance(other, int | float):
+            return Vec3(self.x * other, self.y * other, self.z * other)
 
-    def __truediv__(self, other) -> "Vec3":
+        return self.dot(other)
+
+    def __truediv__(self, other: int | float) -> "Vec3":
         return Vec3(self.x / other, self.y / other, self.z / other)
 
-    def __floordiv__(self, other) -> "Vec3":
+    def __floordiv__(self, other: int | float) -> "Vec3":
         return Vec3(self.x // other, self.y // other, self.z // other)
     
     def __iter__(self):
@@ -267,7 +290,7 @@ class Vec3:
         yield self.y
         yield self.z
     
-    def __getitem__(self, index: int) -> Real:
+    def __getitem__(self, index: int) -> float:
         if index > 2 or index < 0:
             raise ValueError("Index fora da lista.")
         if index == 0:
@@ -276,6 +299,9 @@ class Vec3:
             return self.y
         else:
             return self.z
+
+    def unp(self) -> tuple[float, float, float]:
+        return (self.x, self.y, self.z)
 
     def __repr__(self) -> str:
         return f'[{self.x}, {self.y}, {self.z}]'

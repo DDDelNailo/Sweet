@@ -6,7 +6,7 @@ layout(location = 2) in mat4 model;
 layout(location = 6) in mat4 projection;
 layout(location = 10) in vec4 iUV;
 
-layout(std140, binding = 0) uniform Camera
+layout(std140, binding = 1) uniform Camera
 {
     mat4 view;
     vec2 uOffset;

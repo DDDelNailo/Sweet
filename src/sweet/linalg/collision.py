@@ -1,25 +1,28 @@
-from OpenGL.GL import *
-from pygame.locals import *
+from pygame.locals import * # type: ignore
 from ..vector import Vec2
-from typing import Sequence, Callable
+from typing import Sequence, Any
+from collections.abc import Callable
 from ..common import CollisionData
-from ..entity import EntityManager, Polygon
+from ..entity import EntityManager, Polygon, Entity
 
 class Collision:
     @classmethod
-    def collision_list(cls, element: object, group: Sequence, polygon_a: Polygon = None, polygon_b: Polygon = None, order=True, apply_func:Callable = None) -> list[CollisionData]:
+    def collision_list(cls, element: Entity, group: type | Sequence[Entity], polygon_a: Polygon | None = None, polygon_b: Polygon | None = None, order: bool=True, apply_func: Callable[[Entity, Entity, CollisionData], Any] | None = None) -> list[CollisionData]:
         if polygon_a == None: polygon_a = element.mask.def_polygon()
 
         if isinstance(group, type):
             group = EntityManager.get_entity_group(group)
 
-        result = []
+        result: list[CollisionData] = []
 
         for other in group:
-            use_polygon_b = polygon_b
-            if polygon_b == None: use_polygon_b = other.mask.def_polygon()
+            if not polygon_b == None:
+                use_polygon_b = polygon_b
+            else:
+                use_polygon_b = other.mask.def_polygon()
+
             collision = cls.colliding(element, other, polygon_a, use_polygon_b)
-            if collision:
+            if isinstance(collision, CollisionData):
                 if apply_func:
                     apply_func(element, other, collision)
 
@@ -31,13 +34,16 @@ class Collision:
         return result
 
     @staticmethod
-    def colliding(a: object, b: object, polygon_a: Polygon, polygon_b: Polygon) -> CollisionData:
+    def colliding(a: Entity, b: Entity, polygon_a: Polygon, polygon_b: Polygon) -> CollisionData | bool:
         lowest_overlap: float = float("inf")
         overlap_axis: Vec2 = Vec2(0, 0)
         is_b: bool = False
-        x1, x2 = polygon_a.translate(a.pos), polygon_b.translate(b.pos)
-
-        contact_point: bool = Vec2(0, 0)
+        if isinstance(a.pos, Vec2) and isinstance(b.pos, Vec2):
+            x1, x2 = polygon_a.translate(a.pos), polygon_b.translate(b.pos)
+        else:
+            return False # Implement 3D
+        
+        contact_point = Vec2(0, 0)
 
         for shape in (x1, x2):
             verts = shape.vertices
@@ -75,76 +81,7 @@ class Collision:
 
                     overlap_axis: Vec2 = axis
 
-        return CollisionData(mtv=overlap_axis * lowest_overlap, normal=overlap_axis, is_b=is_b, contact_point=contact_point, entity=b)
-
-    @classmethod
-    def get_collisions(cls, object) -> None:
-        for x in range(-1, 2):
-            for y in range(-1, 2):
-                key = cls.to_key((Vec2(*object.mesh_coordinate) + (x, y)).unp())
-                mesh_grid = cls.mesh.get(key)
-                if mesh_grid == None: continue
-
-                for obj_key in mesh_grid:
-                    if obj_key == object.uid: continue
-
-                    if cls.collision_manifold.get(f'{object.uid};{obj_key}'): continue
-
-                    cls.collision_manifold[f'{obj_key};{object.uid}'] = cls.collision_data(object, mesh_grid[obj_key])
-
-    @classmethod
-    def get_contact_points(cls, x1, x2, normal):
-        ref_i = cls.find_reference_edge(x1.vertices, normal)
-        inc_i = cls.find_incident_edge(x2.vertices, normal)
-
-        ref_v1 = x1.vertices[ref_i]
-        ref_v2 = x1.vertices[(ref_i+1) % len(x1.vertices)]
-
-        inc_v1 = x2.vertices[inc_i]
-        inc_v2 = x2.vertices[(inc_i+1) % len(x2.vertices)]
-
-        ref_edge = (ref_v2 - ref_v1).normalize()
-        ref_normal = ref_edge.rotate90()
-
-        offset = ref_normal.dot(ref_v1)
-
-        clipped = cls.clip(inc_v1, inc_v2,  ref_normal, offset)
-        if len(clipped) < 2:
-            return []
-
-        clipped = cls.clip(clipped[0], clipped[1], -ref_normal, -ref_normal.dot(ref_v2))
-
-        return clipped
-
-    @staticmethod
-    def find_reference_edge(vertices, normal):
-        best = -float("inf")
-        index = 0
-        for i in range(len(vertices)):
-            v1 = vertices[i]
-            v2 = vertices[(i+1) % len(vertices)]
-            edge = (v2 - v1).normalize()
-            face_normal = edge.rotate90()
-            d = face_normal.dot(normal)
-            if d > best:
-                best = d
-                index = i
-        return index
-
-    @staticmethod
-    def clip(v1, v2, normal, offset):
-        out = []
-
-        d1 = normal.dot(v1) - offset
-        d2 = normal.dot(v2) - offset
-
-        if d1 <= 0:
-            out.append(v1)
-        if d2 <= 0:
-            out.append(v2)
-
-        if d1 * d2 < 0:
-            t = d1 / (d1 - d2)
-            out.append(v1 + (v2 - v1) * t)
-
-        return out
+        mtv = (overlap_axis * lowest_overlap)
+        if isinstance(mtv, Vec2):
+            return CollisionData(mtv=mtv, normal=overlap_axis, is_b=is_b, contact_point=contact_point, entity=b)
+        return CollisionData(mtv=Vec2(0, 0), normal=overlap_axis, is_b=is_b, contact_point=contact_point, entity=b)

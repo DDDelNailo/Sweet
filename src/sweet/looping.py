@@ -1,20 +1,22 @@
 import pygame as pg
-from .common import Drawing
-from pygame.locals import *
+from pygame.locals import * # type: ignore
 import os
 from .graphics.shaders import ShaderManager, ShaderRender
-from OpenGL.GL import *
-from .entity import EntityManager
+import OpenGL.GL as gl
+from .entity import EntityManager, Draw
 from .inputting import Input
-from .testing import Testing
 from pathlib import Path
+from PIL import Image
+from typing import Literal, cast
+
+_from_string_format = Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"]
 
 class GameLoop:
     pg.init()
     _title: str = "[No Title]"
-    _screen_size: tuple = (100, 100)
-    _non_full_screen_size: tuple = (100, 100)
-    _color: tuple = (0, 0, 0, 0)
+    _screen_size: tuple[int, int] = (100, 100)
+    _non_full_screen_size: tuple[int, int] = (100, 100)
+    _color: tuple[int, int, int, int] = (0, 0, 0, 0)
     fps: int = 60
     _info = pg.display.Info()
     view_width: int = _info.current_w
@@ -26,6 +28,10 @@ class GameLoop:
     _built = False
     debug: bool = False
     debug_time: bool = False
+
+    @classmethod
+    def get_flags(cls):
+        return cls._flags
 
     @classmethod
     def set_can_fullscreen(cls, value: bool) -> None:
@@ -40,9 +46,10 @@ class GameLoop:
         return cls._fullscreen
     
     @staticmethod
-    def set_icon(icon: Drawing) -> None:
+    def set_icon(icon: Image.Image) -> None:
         data = icon.tobytes()
-        surface = pg.image.fromstring(data, icon.size, icon.mode)
+        fmt = cast(_from_string_format, icon.mode)
+        surface = pg.image.fromstring(data, icon.size, fmt)
         pg.display.set_icon(surface.convert())
 
     @classmethod
@@ -80,24 +87,24 @@ class GameLoop:
         return cls._title
 
     @classmethod
-    def set_background_color(cls, color: tuple) -> None:
+    def set_background_color(cls, color: tuple[int, int, int, int]) -> None:
         if cls._built:
-            glClearColor(*map(lambda x: x / 255, color))
+            gl.glClearColor(*map(lambda x: x / 255, color)) # type: ignore
         cls._color = color
 
     @classmethod
-    def get_background_color(cls) -> tuple:
+    def get_background_color(cls) -> tuple[int, int, int, int]:
         return cls._color
 
     @classmethod
-    def set_screen_size(cls, size: tuple) -> None:
+    def set_screen_size(cls, size: tuple[int, int]) -> None:
         if not cls.get_fullscreen():
             cls._screen_size = size
         if size == (cls.view_width, cls.view_height):
             cls.set_fullscreen(True)
 
     @classmethod
-    def get_screen_size(cls) -> tuple:
+    def get_screen_size(cls) -> tuple[int, int]:
         return cls._screen_size
     
     @classmethod
@@ -105,9 +112,8 @@ class GameLoop:
         ShaderManager.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
         BASE_DIR = Path(__file__).resolve().parent
         BUILD = BASE_DIR / "build"
-        ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
         ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
-        # ShaderManager.build_shaders()
+        ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
         ShaderManager.set_shader("__def__")
         cls._built = True
 
@@ -160,20 +166,16 @@ class GameLoop:
                             os.environ['SDL_VIDEO_CENTERED'] = "1"
                             pg.display.set_mode(max_value, cls.get_flags())
                             pg.display.set_mode(screen_value, cls.get_flags())
-                            cls.update_screen_size(screen_value)
+                            cls.set_screen_size(screen_value)
                         else:
                             screen_value = (cls.view_width, cls.view_height)
                             pg.display.set_mode(screen_value, pg.FULLSCREEN | cls.get_flags())
-                            cls.update_screen_size(screen_value)
+                            cls.set_screen_size(screen_value)
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # type: ignore
 
-            # if not ShaderManager.get_current_shader() == "__def__":
-            #     ShaderManager.set_shader("__def__")
-            #     ShaderManager.set_uniform_value("u_texture", "1i", 0)
-
-            if cls.debug:
-                Testing.cummulation_start()
+            if not ShaderManager.get_current_shader().name == "__def__":
+                Draw.set_state_shader("__def__")
 
             entities = EntityManager.get_tick_entities(0)
             for entity in entities:
@@ -192,27 +194,20 @@ class GameLoop:
                         entity.draw()
 
             ShaderRender.render()
-                        
-            order_changes: list = EntityManager.get_order_changes()
-            for key in order_changes:
-                EntityManager.set_order_change(*order_changes[key])
-
-            layer_changes: list = EntityManager.get_layer_changes()
+              
+            layer_changes = EntityManager.get_layer_changes()
             for key in layer_changes:
                 EntityManager.set_layer_change(*layer_changes[key])
 
-            entity_changes: list = EntityManager.get_entity_changes()
+            entity_changes = EntityManager.get_entity_changes()
             for key in entity_changes:
                 EntityManager.create_entity(*entity_changes[key])
 
-            destroy_changes: list = EntityManager.get_destroy_changes()
-            for key in destroy_changes:
-                EntityManager.destroy_entity(entity_changes[key])
+            destroy_changes = EntityManager.get_destroy_changes()
+            for key in destroy_changes.keys():
+                EntityManager.destroy_entity(destroy_changes[key])
 
             EntityManager.clear_agend()
-
-            if cls.debug:
-                Testing.cummulation_end()
 
             pg.display.flip()
             clock.tick(cls.get_fps())

@@ -9,7 +9,7 @@ class Camera:
     fov: float
 
 class CameraManager:
-    _cams: dict[Camera] = {"main": Camera("main", Vec3(0, 0, -1), Vec3(0, 0, 0), 70.0)}
+    _cams: dict["str", Camera] = {"main": Camera("main", Vec3(0, 0, -1), Vec3(0, 0, 0), 70.0)}
     _main: str = "main"
 
     @classmethod
