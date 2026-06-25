@@ -1,16 +1,21 @@
-import pygame as pg
 from pynput import keyboard
 import pyperclip
 from typing import Callable
+from moderngl_window.context.base import BaseWindow
+from moderngl_window.context.base.keys import BaseKeys
+import glfw
 
 class Input:
     _mouse_pos: tuple[int, int] = (0, 0)
     _keys: dict[int, list[bool]] = {121: [False] * 3}
     _input: bool = False
     _focus: bool = False
-    _mouse: dict[int, list[bool]] = {pg.BUTTON_LEFT: [False] * 3, pg.BUTTON_RIGHT: [False] * 3, pg.BUTTON_MIDDLE: [False] * 3}
-    mouse_scroll_x: int = 0
-    mouse_scroll_y: int = 0
+    _mouse: dict[int, list[bool]] = {1: [False] * 3, 2: [False] * 3, 3: [False] * 3}
+    mouse_scroll_x: float = 0
+    mouse_scroll_y: float = 0
+    _caps: bool = False
+    wnd: BaseWindow
+    key_code: BaseKeys
 
     @classmethod
     def set_caps(cls, value: bool) -> None:
@@ -29,48 +34,64 @@ class Input:
         return cls._focus
 
     @classmethod
+    def set_mouse_pos(cls, x: int, y: int) -> None:
+        glfw.set_cursor_pos(cls.wnd._window, x, y) # type: ignore
+        cls._mouse_pos = (x, y)
+
+    @classmethod
     def get_mouse_pos(cls) -> tuple[int, int]:
         return cls._mouse_pos
 
     @classmethod
     def set_mouse_visibility(cls, visible: bool) -> None:
-        pg.mouse.set_visible(visible)
+        cls.wnd.cursor = visible
 
     @classmethod
-    def update(cls) -> None:
-        keys = pg.key.get_pressed()
-        for inp in cls._keys:
-            cls._keys[inp][0] = False
-            cls._keys[inp][1] = False
+    def process_key_event(cls, key: int, action: int, keys_enum: BaseKeys):
+        if key not in cls._keys:
+            cls._keys[key] = [False, False, False]
             
-            if keys[inp]:
-                if not cls._keys[inp][2]:
-                    cls._keys[inp][0] = True
-
-                cls._keys[inp][2] = True
-            else:
-                if cls._keys[inp][2]:
-                    cls._keys[inp][1] = True
-
-                cls._keys[inp][2] = False
-
-        cls._mouse_pos = pg.mouse.get_pos()
-        buttons = pg.mouse.get_pressed()
+        cls._keys[key][0] = False
+        cls._keys[key][1] = False
         
-        for inp in cls._mouse:
-            cls._mouse[inp][0] = False
-            cls._mouse[inp][1] = False
+        if action == keys_enum.ACTION_PRESS:
+            if not cls._keys[key][2]:
+                cls._keys[key][0] = True
+            cls._keys[key][2] = True
+            
+        elif action == keys_enum.ACTION_RELEASE:
+            if cls._keys[key][2]:
+                cls._keys[key][1] = True
+            cls._keys[key][2] = False
 
-            if buttons[int(inp) - 1]:
-                if not cls._mouse[inp][2]:
-                    cls._mouse[inp][0] = True
+    @classmethod
+    def process_mouse_button_event(cls, button: int, action: int, keys_enum: BaseKeys):
+        button_str = button + 1
+        
+        if button_str not in cls._mouse:
+            cls._mouse[button_str] = [False, False, False]
+            
+        cls._mouse[button_str][0] = False
+        cls._mouse[button_str][1] = False
+        
+        if action == keys_enum.ACTION_PRESS:
+            if not cls._mouse[button_str][2]:
+                cls._mouse[button_str][0] = True
+            cls._mouse[button_str][2] = True
+            
+        elif action == keys_enum.ACTION_RELEASE:
+            if cls._mouse[button_str][2]:
+                cls._mouse[button_str][1] = True
+            cls._mouse[button_str][2] = False
 
-                cls._mouse[inp][2] = True
-            else:
-                if cls._mouse[inp][2]:
-                    cls._mouse[inp][1] = True
-
-                cls._mouse[inp][2] = False
+    @classmethod
+    def clear_frame_deltas(cls):
+        for key in cls._keys:
+            cls._keys[key][0] = False
+            cls._keys[key][1] = False
+        for btn in cls._mouse:
+            cls._mouse[btn][0] = False
+            cls._mouse[btn][1] = False
 
     @classmethod
     def get_keys(cls):

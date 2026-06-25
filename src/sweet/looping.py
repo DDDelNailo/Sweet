@@ -1,33 +1,209 @@
+import glfw
+import moderngl_window as mglw
+from moderngl_window.timers.clock import Timer
+from moderngl_window.context.base.keys import BaseKeys, KeyModifiers
+
+# from pathlib import Path
 import pygame as pg
-from pygame.locals import * # type: ignore
-import os
-from .graphics.shaders import ShaderManager, ShaderRender
-import OpenGL.GL as gl
-from .entity import EntityManager, Draw
+# from .graphics.shaders import ShaderManager, ShaderRender
+from .entity import EntityManager
 from .inputting import Input
-from pathlib import Path
 from PIL import Image
 from typing import Literal, cast
+from pygame.locals import * # type: ignore
 
 _from_string_format = Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"]
+delta_time = 0
+
+class EngineWindow:
+    def __init__(self, title: str="[Sem Nome]", size: tuple[int, int]=(1280, 720), fullscreen: bool=False, borderless: bool=False, resizable: bool = False, color: tuple[float, float, float, float]=(0, 0, 0, 1), samples: int=4):
+        window_cls = mglw.get_window_cls('moderngl_window.context.glfw.Window')
+        self.wnd = window_cls(
+            title=title,
+            gl_version=(3, 3),
+            size=size,
+            resizable=resizable,
+            fullscreen=fullscreen,
+            samples=samples,
+            borderless=borderless,
+            vsync=False
+        )
+        
+        self.color = color
+        self.ctx = self.wnd.ctx
+        self.keys: BaseKeys = cast(BaseKeys, self.wnd.keys)
+        Input.key_code = self.keys
+        
+        self.wnd.resize_func = self._on_resize
+        self.wnd.key_event_func = self._on_key_event
+        self.wnd.mouse_press_event_func = self._on_mouse_press
+        self.wnd.mouse_release_event_func = self._on_mouse_release
+        self.wnd.mouse_position_event_func = self._on_mouse_move
+        self.wnd.mouse_scroll_event_func = self._on_mouse_scroll
+        self.wnd.iconify_func = self._on_iconify_changed
+        
+        mglw.activate_context(window=self.wnd)
+        
+        self.timer = Timer()
+        self.timer.start()
+
+    @property
+    def size(self):
+        return self.wnd.size
+
+    @size.setter
+    def size(self, value: tuple[int, int]):
+        self.wnd.size = value
+
+    @property
+    def position(self):
+        return self.wnd.position
+
+    @position.setter
+    def position(self, value: tuple[int, int]):
+        self.wnd.position = value
+
+    def toggle_fullscreen(self):
+        self.wnd.fullscreen = not self.wnd.fullscreen
+
+    def toggle_cursor(self):
+        self.wnd.cursor = not self.wnd.cursor
+
+    def center(self):
+        monitor = glfw.get_primary_monitor()
+        if not monitor:
+            return
+            
+        video_mode = glfw.get_video_mode(monitor) # type: ignore
+        screen_w = video_mode.size.width
+        screen_h = video_mode.size.height
+        
+        win_w, win_h = self.size
+        self.position = ((screen_w - win_w) // 2, (screen_h - win_h) // 2)
+
+    def _on_mouse_press(self, x: int, y: int, button: int):
+        Input.process_mouse_button_event(button, self.keys.ACTION_PRESS, self.keys)
+
+    def _on_mouse_release(self, x: int, y: int, button: int):
+        Input.process_mouse_button_event(button, self.keys.ACTION_RELEASE, self.keys)
+
+    def _on_resize(self, width: int, height: int):
+        self.ctx.viewport = (0, 0, width, height)
+
+    def _on_mouse_move(self, x: int, y: int, dx: int, dy: int):
+        Input.set_mouse_pos(x, y)
+        pass
+
+    def _on_key_event(self, key: int, action: int, modifiers: KeyModifiers):
+        Input.process_key_event(key, action, self.keys)
+
+        if action == self.keys.ACTION_PRESS:
+            if key == self.keys.CAPS_LOCK:
+                Input.set_caps(not Input.get_caps())
+
+    def _on_mouse_scroll(self, x_offset: float, y_offset: float):
+        Input.mouse_scroll_x = x_offset
+        Input.mouse_scroll_y = y_offset
+
+    def _on_iconify_changed(self, has_focus: bool):
+        pass
+
+    def run(self):
+        self.center()
+
+        TICK_PER_SECOND = 60
+        DELTA_TIME = 1.0 / TICK_PER_SECOND
+
+        accumulator = 0.0
+        
+        while not self.wnd.is_closing:
+            #current, delta
+            _, delta_time = self.timer.next_frame()
+            
+            accumulator += delta_time
+
+            while accumulator >= DELTA_TIME:
+                self.update(DELTA_TIME)
+                accumulator -= DELTA_TIME
+
+            self.ctx.clear(*self.color)
+            
+            self.update(delta_time)
+            self.render()
+            
+            self.wnd.swap_buffers()
+            
+        self.wnd.destroy()
+        
+    def update(self, dt: float):
+        global delta_time
+        delta_time = dt
+        entities = EntityManager.get_tick_entities(0)
+        for entity in entities:
+            entities[entity].pre_tick()
+        entities = EntityManager.get_tick_entities(1)
+        for entity in entities:
+            entities[entity].tick()
+        entities = EntityManager.get_tick_entities(2)
+        for entity in entities:
+            entities[entity].pos_tick()
+                
+        # entities = EntityManager.get_all_entities()
+        # for order in entities.values():
+        #     for layer in order.values():
+        #         for entity in layer:
+        #             entity.draw()
+              
+        layer_changes = EntityManager.get_layer_changes()
+        for key in layer_changes:
+            EntityManager.set_layer_change(*layer_changes[key])
+
+        entity_changes = EntityManager.get_entity_changes()
+        for key in entity_changes:
+            EntityManager.create_entity(*entity_changes[key])
+
+        destroy_changes = EntityManager.get_destroy_changes()
+        for key in destroy_changes.keys():
+            EntityManager.destroy_entity(destroy_changes[key])
+
+        EntityManager.clear_agend()
+
+    def render(self):
+        pass
+        # ShaderRender.render()
+
+def get_window_data() -> tuple[int, int]:
+    if glfw.init():
+        monitor = glfw.get_primary_monitor()
+        if monitor:
+            video_mode = glfw.get_video_mode(monitor) # type: ignore
+            
+            view_width: int = video_mode.size.width
+            view_height: int = video_mode.size.height
+        else:
+            view_width, view_height = 1280, 720
+            
+        glfw.terminate()
+    else:
+        view_width, view_height = 1280, 720
+    return view_width, view_height
 
 class GameLoop:
-    pg.init()
-    _title: str = "[No Title]"
-    _screen_size: tuple[int, int] = (100, 100)
+    _title: str = "[Sem Nome]"
+    _screen_size: tuple[int, int] = (200, 200)
     _non_full_screen_size: tuple[int, int] = (100, 100)
-    _color: tuple[int, int, int, int] = (0, 0, 0, 0)
+    _color: tuple[float, float, float, float] = (0, 0, 0, 0)
     fps: int = 60
-    _info = pg.display.Info()
-    view_width: int = _info.current_w
-    view_height: int = _info.current_h
+    view_width, view_height = get_window_data()
     _fullscreen: bool = False
-    _resizable: bool = False
+    _resizable: bool = True
+    _borderless: bool = False
     _fullscreenable: bool = False
-    _flags: int = DOUBLEBUF | OPENGL
     _built = False
     debug: bool = False
     debug_time: bool = False
+    _gl_version = (3, 3)
+    _game_window: EngineWindow
 
     @classmethod
     def get_flags(cls):
@@ -87,13 +263,11 @@ class GameLoop:
         return cls._title
 
     @classmethod
-    def set_background_color(cls, color: tuple[int, int, int, int]) -> None:
-        if cls._built:
-            gl.glClearColor(*map(lambda x: x / 255, color)) # type: ignore
-        cls._color = color
+    def set_background_color(cls, color: tuple[float, float, float, float]) -> None:
+        cls._color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
 
     @classmethod
-    def get_background_color(cls) -> tuple[int, int, int, int]:
+    def get_background_color(cls) -> tuple[float, float, float, float]:
         return cls._color
 
     @classmethod
@@ -109,12 +283,25 @@ class GameLoop:
     
     @classmethod
     def init(cls) -> None:
-        ShaderManager.init_opengl(cls.get_screen_size(), cls._flags, cls._title, cls._color)
-        BASE_DIR = Path(__file__).resolve().parent
-        BUILD = BASE_DIR / "build"
-        ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
-        ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
-        ShaderManager.set_shader("__def__")
+        window = EngineWindow(
+            title="Custom Instance Sandbox", 
+            size=cls._screen_size, 
+            fullscreen=cls._fullscreen,
+            borderless=cls._borderless,
+            resizable=cls._resizable,
+            color=cls._color,
+            samples=4
+        )
+
+        cls._game_window = window
+        Input.wnd = window.wnd
+        
+
+        # BASE_DIR = Path(__file__).resolve().parent
+        # BUILD = BASE_DIR / "build"
+        # ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
+        # ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
+        # ShaderManager.set_shader("__def__")
         cls._built = True
 
     @classmethod
@@ -124,93 +311,11 @@ class GameLoop:
     @classmethod
     def start(cls) -> None:
         cls._fps = 60
-        clock = pg.time.Clock()
-        cls._running = True
 
-        while cls._running:
-            Input.update()
+        cls._game_window.run()
 
-            Input.mouse_scroll_x = 0
-            Input.mouse_scroll_y = 0
-            for event in pg.event.get():
-                mods = pg.key.get_mods()
-                if mods & pg.KMOD_CAPS:
-                    Input.set_caps(True)
-                else:
-                    Input.set_caps(False)
-                if event.type == pg.QUIT:
-                    cls._running = False
-
-                if event.type == pg.MOUSEWHEEL:
-                    Input.mouse_scroll_x = event.x
-                    Input.mouse_scroll_y = event.y
-
-                if event.type == pg.WINDOWFOCUSLOST:
-                    Input.set_focus(False)
-
-                if event.type == pg.WINDOWFOCUSGAINED:
-                    Input.set_focus(True)
-
-                if cls.get_resizable():
-                    if event.type == pg.VIDEORESIZE:
-                        GameLoop.set_screen_size((event.w, event.h))
-
-                if cls.get_can_fullscreen():
-                    if event.type == pg.KEYDOWN and event.key == pg.K_F11:
-                        cls.set_fullscreen(not cls.get_fullscreen())
-
-                        if not cls.get_fullscreen():
-                            max_value = (cls.view_width, cls.view_height)
-                            screen_value = cls.get_screen_size()
-                            screen_value = (min(screen_value[0], max_value[0] - 30), min(screen_value[1], max_value[1] - 80))
-                            os.environ['SDL_VIDEO_CENTERED'] = "1"
-                            pg.display.set_mode(max_value, cls.get_flags())
-                            pg.display.set_mode(screen_value, cls.get_flags())
-                            cls.set_screen_size(screen_value)
-                        else:
-                            screen_value = (cls.view_width, cls.view_height)
-                            pg.display.set_mode(screen_value, pg.FULLSCREEN | cls.get_flags())
-                            cls.set_screen_size(screen_value)
-
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # type: ignore
-
-            if not ShaderManager.get_current_shader().name == "__def__":
-                Draw.set_state_shader("__def__")
-
-            entities = EntityManager.get_tick_entities(0)
-            for entity in entities:
-                entities[entity].pre_tick()
-            entities = EntityManager.get_tick_entities(1)
-            for entity in entities:
-                entities[entity].tick()
-            entities = EntityManager.get_tick_entities(2)
-            for entity in entities:
-                entities[entity].pos_tick()
-                
-            entities = EntityManager.get_all_entities()
-            for order in entities.values():
-                for layer in order.values():
-                    for entity in layer:
-                        entity.draw()
-
-            ShaderRender.render()
-              
-            layer_changes = EntityManager.get_layer_changes()
-            for key in layer_changes:
-                EntityManager.set_layer_change(*layer_changes[key])
-
-            entity_changes = EntityManager.get_entity_changes()
-            for key in entity_changes:
-                EntityManager.create_entity(*entity_changes[key])
-
-            destroy_changes = EntityManager.get_destroy_changes()
-            for key in destroy_changes.keys():
-                EntityManager.destroy_entity(destroy_changes[key])
-
-            EntityManager.clear_agend()
-
-            pg.display.flip()
-            clock.tick(cls.get_fps())
+            # if not ShaderManager.get_current_shader().name == "__def__":
+            #     Draw.set_state_shader("__def__")
 
 if __name__ == "__main__":
     GameLoop.start()

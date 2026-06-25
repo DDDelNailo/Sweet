@@ -1,23 +1,22 @@
 import math
-import pygame
 from pygame.locals import * # type: ignore
 import sweet as sw
-from pathlib import Path
 from sweet.vector import Vec3
 
 sw.Display.resizable(True)
 screen_size = sw.Display.screen_size
-sw.Display.size((screen_size[0], screen_size[1]))
+sw.Display.size((screen_size[0] - 100, screen_size[1] - 300))
 sw.Display.background((255, 230, 147, 255))
 
 sw.init()
 
-CWD = Path.cwd()
-sw.Textures.load_json_resource(CWD / "assets.json")
+# CWD = Path.cwd()
+# sw.Textures.load_json_resource(CWD / "assets.json")
 
 class test(sw.Entity):
     def __init__(self):
-        super().__init__(sw.Textures.get("player"), (0, 0, 175), order=3, tick=True)
+        #sw.Textures.get("player")
+        super().__init__(None, (0, 0, 175), order=3, tick=True)
         self.pos: Vec3
         self.angle: Vec3
         self.camera_angle = Vec3(0, 0, 0)
@@ -34,29 +33,29 @@ class test(sw.Entity):
         self.velocity.y -= .5
         self.pos += self.velocity
 
-        if sw.inputting.Input.get_press(K_w):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.W):
             self.pos.x -= math.sin(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z -= math.cos(math.radians(self.camera_angle.x)) * self.speed
-        if sw.inputting.Input.get_press(K_s):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.S):
             self.pos.x += math.sin(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z += math.cos(math.radians(self.camera_angle.x)) * self.speed
-        if sw.inputting.Input.get_press(K_a):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.A):
             self.pos.x -= math.cos(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z += math.sin(math.radians(self.camera_angle.x)) * self.speed
-        if sw.inputting.Input.get_press(K_d):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.D):
             self.pos.x += math.cos(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * self.speed
         self.pos.y = max(self.pos.y, 60)
-        if sw.inputting.Input.get_pressed(K_SPACE) and self.pos.y <= 60:
+        if sw.inputting.Input.get_pressed(sw.inputting.Input.key_code.SPACE) and self.pos.y <= 60:
             self.velocity.y = 20
 
-        if sw.inputting.Input.get_press(K_TAB):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.TAB):
             self.perspective = not self.perspective
 
-        if sw.inputting.Input.get_press(K_q):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.Q):
             self.fov += 1
 
-        if sw.inputting.Input.get_press(K_e):
+        if sw.inputting.Input.get_press(sw.inputting.Input.key_code.E):
             self.fov -= 1
 
         main_cam = sw.camera.CameraManager.get_main_camera()
@@ -76,10 +75,10 @@ class test(sw.Entity):
         main_cam.angles = self.camera_angle
 
         if self.mouse_x == 0 or self.mouse_x == screen_size[0] - 1:
-            pygame.mouse.set_pos(screen_size[0] // 2, self.mouse_y)
+            sw.inputting.Input.set_mouse_pos(screen_size[0] // 2, self.mouse_y)
             self.mouse_x = screen_size[0] // 2
         if self.mouse_y == 0 or self.mouse_y == screen_size[1] - 1:
-            pygame.mouse.set_pos(self.mouse_x, screen_size[1] // 2)
+            sw.inputting.Input.set_mouse_pos(self.mouse_x, screen_size[1] // 2)
             self.mouse_y = screen_size[1] // 2
 
     def draw(self):
@@ -94,5 +93,5 @@ class test(sw.Entity):
             sw.entity.Draw.draw_image(front_pillar, Vec3(400 * i, 0, 170), Vec3(10, 10, 10), self.angle, perspective=self.perspective)
 
 test()
-# sw.Scene.create(test)
+# # sw.Scene.create(test)
 sw.run()
