@@ -1,5 +1,6 @@
-from .graphics.shaders import ShaderRender
 from .graphics.texture import Imaging
+from .graphics.shaders import ShaderRender
+from .graphics.model import ModelInstance, Model
 import OpenGL.GL as gl
 import pygame as pg
 from .common import Sprite, FileType
@@ -307,20 +308,21 @@ class Draw:
 
     @classmethod
     def draw_image(cls,
-                   image: Imaging,
+                   model: ModelInstance,
+                   image: Imaging | None,
                    pos: Vec3,
                    scale: Vec3,
                    angle: Vec3,
                    color: tuple[int | float, int | float, int | float, int | float]=(255, 255, 255, 255),
                    perspective: bool=True,
                    static: bool=False) -> None:
-        
-        unit = gl.GL_TEXTURE0 # type: ignore
 
         color = (color[0] / 255, color[1] / 255, color[2] / 255, color[3] / 255)
         angle = Vec3(angle.x * pi / 180, angle.y * pi / 180, angle.z * pi / 180)
-        sprite = Sprite(image.uv.tex_id,
-                        image.uv.uv,
+
+        sprite = Sprite(
+                        model.name,
+                        image if image is None else image.uv,
                         pos.unp(),
                         scale.unp(),
                         angle.unp(),
@@ -328,8 +330,8 @@ class Draw:
                         perspective,
                         static,
                         cls._state_shader,
-                        cls._state_attr,
-                        unit)
+                        cls._state_attr)
+        
         ShaderRender.add_draw_call(sprite)
 
     @classmethod
@@ -362,7 +364,9 @@ class Draw:
         image.upload()
 
         width, height = (image.get_width(), image.get_height())
-        cls.draw_image(image,
+        cls.draw_image(
+                       Model.get_model("__flat__"),
+                       image,
                        Vec3(pos[0] + width * scale[0] * align[0] / 2, pos[1] + height * scale[1] * align[1] / 2, pos[2]),
                        Vec3(width * scale[0], height * scale[1], 1),
                        angle=angle,

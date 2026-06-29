@@ -1,12 +1,13 @@
 import glfw
 import moderngl_window as mglw
 from moderngl_window.timers.clock import Timer
+from moderngl_window.context.base import BaseWindow
 from moderngl_window.context.base.keys import BaseKeys, KeyModifiers
 
-# from pathlib import Path
+from pathlib import Path
 import pygame as pg
-# from .graphics.shaders import ShaderManager, ShaderRender
-from .entity import EntityManager
+from .graphics.shaders import ShaderRender, ShaderManager
+from .entity import EntityManager, Draw
 from .inputting import Input
 from PIL import Image
 from typing import Literal, cast
@@ -40,8 +41,9 @@ class EngineWindow:
         self.wnd.mouse_release_event_func = self._on_mouse_release
         self.wnd.mouse_position_event_func = self._on_mouse_move
         self.wnd.mouse_scroll_event_func = self._on_mouse_scroll
-        self.wnd.iconify_func = self._on_iconify_changed
         
+        glfw.set_window_focus_callback(self.wnd._window, self._on_focus_change) # type: ignore
+
         mglw.activate_context(window=self.wnd)
         
         self.timer = Timer()
@@ -105,8 +107,8 @@ class EngineWindow:
         Input.mouse_scroll_x = x_offset
         Input.mouse_scroll_y = y_offset
 
-    def _on_iconify_changed(self, has_focus: bool):
-        pass
+    def _on_focus_change(self, window: BaseWindow, has_focus: int):
+        Input.set_focus(True if has_focus else False)
 
     def run(self):
         self.center()
@@ -128,7 +130,6 @@ class EngineWindow:
 
             self.ctx.clear(*self.color)
             
-            self.update(delta_time)
             self.render()
             
             self.wnd.swap_buffers()
@@ -147,12 +148,6 @@ class EngineWindow:
         entities = EntityManager.get_tick_entities(2)
         for entity in entities:
             entities[entity].pos_tick()
-                
-        # entities = EntityManager.get_all_entities()
-        # for order in entities.values():
-        #     for layer in order.values():
-        #         for entity in layer:
-        #             entity.draw()
               
         layer_changes = EntityManager.get_layer_changes()
         for key in layer_changes:
@@ -169,8 +164,16 @@ class EngineWindow:
         EntityManager.clear_agend()
 
     def render(self):
-        pass
-        # ShaderRender.render()
+        if not ShaderManager.get_current_shader().name == "__def__":
+            Draw.set_state_shader("__def__")
+
+        entities = EntityManager.get_all_entities()
+        for order in entities.values():
+            for layer in order.values():
+                for entity in layer:
+                    entity.draw()
+
+        ShaderRender.render()
 
 def get_window_data() -> tuple[int, int]:
     if glfw.init():
@@ -190,7 +193,6 @@ def get_window_data() -> tuple[int, int]:
 
 class GameLoop:
     _title: str = "[Sem Nome]"
-    _screen_size: tuple[int, int] = (200, 200)
     _non_full_screen_size: tuple[int, int] = (100, 100)
     _color: tuple[float, float, float, float] = (0, 0, 0, 0)
     fps: int = 60
@@ -204,10 +206,6 @@ class GameLoop:
     debug_time: bool = False
     _gl_version = (3, 3)
     _game_window: EngineWindow
-
-    @classmethod
-    def get_flags(cls):
-        return cls._flags
 
     @classmethod
     def set_can_fullscreen(cls, value: bool) -> None:
@@ -237,10 +235,6 @@ class GameLoop:
     @classmethod
     def set_resizable(cls, value: bool) -> None:
         cls._resizable = value
-
-        cls._flags = DOUBLEBUF | OPENGL
-        if cls._resizable:
-            cls._flags = DOUBLEBUF | OPENGL | pg.RESIZABLE
 
     @classmethod
     def get_resizable(cls) -> bool:
@@ -284,7 +278,7 @@ class GameLoop:
     @classmethod
     def init(cls) -> None:
         window = EngineWindow(
-            title="Custom Instance Sandbox", 
+            title=cls._title, 
             size=cls._screen_size, 
             fullscreen=cls._fullscreen,
             borderless=cls._borderless,
@@ -294,14 +288,13 @@ class GameLoop:
         )
 
         cls._game_window = window
+        glfw.focus_window(window.wnd._window) # type: ignore
         Input.wnd = window.wnd
         
-
-        # BASE_DIR = Path(__file__).resolve().parent
-        # BUILD = BASE_DIR / "build"
-        # ShaderManager.add_shader("game", "resources/shader/game.vsh", "resources/shader/game.fsh")
-        # ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
-        # ShaderManager.set_shader("__def__")
+        BASE_DIR = Path(__file__).resolve().parent
+        BUILD = BASE_DIR / "build"
+        ShaderManager.set_context(window.ctx)
+        ShaderManager.add_shader("__def__", BUILD / "__sh__.vsh", BUILD / "__sh__.fsh")
         cls._built = True
 
     @classmethod
@@ -313,9 +306,6 @@ class GameLoop:
         cls._fps = 60
 
         cls._game_window.run()
-
-            # if not ShaderManager.get_current_shader().name == "__def__":
-            #     Draw.set_state_shader("__def__")
 
 if __name__ == "__main__":
     GameLoop.start()

@@ -21,12 +21,15 @@ class Texture:
     @classmethod
     def load_json_textures(cls, path: str | Path) -> None:
         with open(path, "r") as file:
-            textures = json.load(file)
-        
-        for key in textures.keys():
-            path = textures[key]
-            absolute_path = solve_path(path)
-            cls.set_texture(key, absolute_path)
+            assets = json.load(file)
+            
+        for asset_type in assets.keys():
+            if asset_type == "textures":
+                textures = assets[asset_type]
+                for key in textures.keys():
+                    path = textures[key]
+                    absolute_path = solve_path(path)
+                    cls.set_texture(key, absolute_path)
 
     @classmethod
     def set_texture(cls, name: str, path: Path) -> "Imaging":
@@ -174,8 +177,8 @@ class Imaging:
     def get_uv(self) -> UVLocation:
         return self.uv
     
-    def get_tex_id(self) -> int:
-        return self.uv.tex_id
+    def get_texture(self) -> str | None:
+        return self.uv.texture
 
     def upload(self) -> None:
         if self.occupation == None:

@@ -1,6 +1,8 @@
 from enum import Enum, auto
 from dataclasses import dataclass, field
 from .vector import Vec2
+import numpy as np
+import moderngl
 
 class FileType(Enum):
     STREAM = auto()
@@ -38,7 +40,7 @@ class Rec:
 
 @dataclass
 class UVLocation:
-    tex_id: int = -1
+    texture: str | None = None
     uv: Rec = field(default_factory=lambda: Rec(0, 0, 0, 0))
 
 @dataclass
@@ -51,8 +53,8 @@ class CollisionData:
 
 @dataclass
 class Sprite:
-    texture_id: int
-    uv: Rec
+    model: str
+    texture: UVLocation | None
     pos: tuple[float, float, float]
     scale: tuple[float, float, float]
     rotation: tuple[float, float, float]
@@ -61,4 +63,23 @@ class Sprite:
     static: bool
     shader: str
     attrs: dict[str, tuple[int | float, ...]]
-    unit: int
+
+@dataclass
+class Geometry:
+    vbo_data: np.ndarray
+    ebo_data: np.ndarray
+    index_count: int
+    vao: moderngl.VertexArray | None = None
+
+@dataclass
+class Object:
+    mesh: Geometry
+    texture: UVLocation
+    pos: tuple[float, float, float]
+    scale: tuple[float, float, float]
+    rotation: tuple[float, float, float]
+    color: tuple[float, float, float, float]
+    perspective: bool
+    static: bool
+    shader: str
+    attrs: dict[str, tuple[int | float, ...]]

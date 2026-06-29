@@ -5,7 +5,7 @@ in vec4 v_color;
 in vec3 v_normal;
 in vec3 v_frag_pos;
 
-uniform sampler2D uTexture;
+uniform sampler2D sw_texture;
 out vec4 FragColor;
 
 void main()
@@ -15,7 +15,7 @@ void main()
     float ambientStrength = 0.25;
     float alphaThreshold = 0.05;
 
-    vec4 texColor = texture(uTexture, v_texcoord) * v_color;
+    vec4 texColor = texture(sw_texture, v_texcoord) * v_color;
     vec3 ambient = ambientStrength * lightColor;
 
     // 2. Diffuse Component (The "Normal" workhorse)

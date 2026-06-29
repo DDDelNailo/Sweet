@@ -1,6 +1,7 @@
 from sweet.graphics.texture import Imaging # type: ignore
 from sweet.vector import Vec2, Vec3 # type: ignore
 from pathlib import Path
+import moderngl
 
 from . import (
     camera, # type: ignore
@@ -49,21 +50,57 @@ class Entity(entity.Entity):
                 tick,
                 pos_tick
         )
-    
-class Display:
-    screen_size = (looping.GameLoop.view_width, looping.GameLoop.view_height)
 
+class Resources:
     @staticmethod
-    def set_shader(name: str):
+    def load_assets(path: str | Path):
+        graphics.texture.Texture.load_json_textures(path)
+        graphics.model.Model.load_json_models(path)
+    
+    @staticmethod
+    def texture(name: str):
+        return graphics.texture.Texture.get_texture(name)
+    
+    @staticmethod
+    def model(name: str):
+        return graphics.model.Model.get_model(name)
+
+class Shader:
+    @staticmethod
+    def use(name: str):
         entity.Draw.set_state_shader(name)
 
     @staticmethod
-    def add_shader(path_vertex: str, path_fragment: str, name: str | None=None):
+    def add(path_vertex: str | Path, path_fragment: str | Path, name: str | None=None):
         if name is None:
             # Extracts the file name of the vertex shaders without the extension
-            name = path_vertex.split("/")[-1].split(".")[0]
+            path_str = str(path_vertex)
+            name = path_str.split("/")[-1].split(".")[0]
             
-        graphics.shaders.ShaderManager.add_shader(name, path_vertex, path_fragment)
+        return graphics.shaders.ShaderManager.add_shader(name, path_vertex, path_fragment)
+
+    @staticmethod
+    def new_fbo(size: tuple[int, int]) -> moderngl.Framebuffer:
+        return graphics.shaders.ShaderTexture.create_fbo(size)
+    
+    @staticmethod
+    def use_frame(fbo: moderngl.Framebuffer | None, depth_test: bool=True, clear_color: tuple[float, float, float, float]=(0, 0, 0, 1)):
+        graphics.shaders.ShaderRender.set_frame_buffer(fbo, depth_test, clear_color)
+
+    @staticmethod
+    def force_draw():
+        graphics.shaders.ShaderRender.render()
+
+    @staticmethod
+    def ubo(binding: int, name: str, type: str, *values: int | float):
+        graphics.shaders.ShaderRender.add_ubo_data(binding, name, type, *values)
+
+    @staticmethod
+    def ssbo(binding: int, name: str, type: str, *values: int | float):
+        graphics.shaders.ShaderRender.add_ssbo_data(binding, name, type, *values)
+
+class Display:
+    screen_size = (looping.GameLoop.view_width, looping.GameLoop.view_height)
 
     @staticmethod
     def size(size: tuple[int, int]) -> None:
@@ -93,15 +130,6 @@ class Display:
     def icon(image: Imaging) -> None:
         looping.GameLoop.set_icon(image.get_image())
 
-class Textures:
-    @staticmethod
-    def load_json_resource(path: str | Path) -> None:
-        graphics.texture.Texture.load_json_textures(path)
-    
-    @staticmethod
-    def get(name: str):
-        return graphics.texture.Texture.get_texture(name)
-
 class Animations:
     @staticmethod
     def load_json_resource(path: str | Path) -> None:
@@ -111,4 +139,4 @@ class Animations:
     def get(name: str):
         return graphics.texture.Animation.get_video(name)
 
-__all__ = ["Textures", "Display"]
+__all__ = ["Resources", "Display"]
