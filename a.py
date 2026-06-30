@@ -1,8 +1,10 @@
 import math
-from pygame.locals import * # type: ignore
+from pathlib import Path
+
+from pygame.locals import *  # type: ignore
+
 import sweet as sw
 from sweet.vector import Vec3
-from pathlib import Path
 
 sw.Display.resizable(True)
 screen_size = sw.Display.screen_size
@@ -14,13 +16,13 @@ sw.init()
 CWD = Path.cwd()
 sw.Resources.load_assets(CWD / "assets.json")
 BUILD = CWD / "src" / "sweet" / "build"
-panini = sw.Shader.add(BUILD / "__panini__.vsh", BUILD / "__panini__.fsh", "panini")
-panini_program = panini.program
+
 panini_fbo = sw.Shader.new_fbo(screen_size)
+
 
 class test(sw.Entity):
     def __init__(self):
-        #sw.Textures.get("player")
+        # sw.Textures.get("player")
         super().__init__(None, (0, 0, 175), order=3, tick=True)
         self.pos: Vec3
         self.angle: Vec3
@@ -28,7 +30,7 @@ class test(sw.Entity):
         self.mouse_x, self.mouse_y = sw.inputting.Input.get_mouse_pos()
         self.perspective = True
         self.fov = 70
-        self.speed = 5
+        self.speed = 1
         self.player_height = 1
         self.velocity = Vec3(0, 0, 0)
         sw.inputting.Input.set_mouse_visibility(False)
@@ -37,7 +39,7 @@ class test(sw.Entity):
 
     def tick(self):
         # direction = self.camera_angle.direction() * self.speed
-        self.velocity.y -= .5
+        self.velocity.y -= 0.5
         self.pos += self.velocity
 
         if sw.inputting.Input.get_press(sw.inputting.Input.key_code.W):
@@ -53,7 +55,10 @@ class test(sw.Entity):
             self.pos.x += math.cos(math.radians(self.camera_angle.x)) * self.speed
             self.pos.z -= math.sin(math.radians(self.camera_angle.x)) * self.speed
         self.pos.y = max(self.pos.y, self.player_height)
-        if sw.inputting.Input.get_pressed(sw.inputting.Input.key_code.SPACE) and self.pos.y <= self.player_height:
+        if (
+            sw.inputting.Input.get_pressed(sw.inputting.Input.key_code.SPACE)
+            and self.pos.y <= self.player_height
+        ):
             self.velocity.y = 20
 
         if sw.inputting.Input.get_press(sw.inputting.Input.key_code.I):
@@ -86,9 +91,9 @@ class test(sw.Entity):
         mouse_dx = mouse_x - self.mouse_x
         mouse_dy = mouse_y - self.mouse_y
         self.mouse_x, self.mouse_y = mouse_x, mouse_y
-        
-        self.camera_angle.x -= mouse_dx * .2
-        self.camera_angle.y += mouse_dy * .2
+
+        self.camera_angle.x -= mouse_dx * 0.2
+        self.camera_angle.y += mouse_dy * 0.2
         self.camera_angle.y = min(90, max(-90, self.camera_angle.y))
 
         # self.camera_angle = Vec3(0, 0, 0)
@@ -105,7 +110,8 @@ class test(sw.Entity):
         # pillar = sw.Textures.get("pillar")
         front_pillar = sw.Resources.texture("plane")
         plane = sw.Resources.model("aviao")
-        outro = sw.Resources.model("__quad__")
+        lixeira = sw.Resources.model("lixeira")
+        outro = sw.Resources.model("aviao")
         # sw.entity.Draw.draw_image(floor, Vec3(0, 0, floor.get_height() // 2), Vec3(floor.get_width(), floor.get_height(), 1), Vec3(90, 0, 0), perspective=self.perspective)
         # for i in range(0, 1):
         #     sw.entity.Draw.draw_image(wall, Vec3(wall.get_width() * i, wall.get_height() // 2, 0), Vec3(wall.get_width(), wall.get_height(), 1), self.angle, perspective=self.perspective)
@@ -115,15 +121,39 @@ class test(sw.Entity):
 
         # sw.Shader.use_frame(panini_fbo, clear_color=(1, 0, 0, 1))
         main_cam = sw.camera.CameraManager.get_main_camera()
-        sw.Shader.ubo(0, "uCamPos", "3f", *(main_cam.pos.unp()))
-        sw.entity.Draw.draw_image(plane, front_pillar, Vec3(self.a.x, self.a.y, self.a.z), Vec3(1, 1, 1), self.angle, perspective=self.perspective)
+        sw.Shader.ubo(0, "uCamPos", "3f", 0, 100, 0)
+        sw.entity.Draw.draw_image(
+            plane,
+            front_pillar,
+            Vec3(self.a.x, self.a.y, self.a.z),
+            Vec3(1, 1, 1),
+            self.angle,
+            perspective=self.perspective,
+        )
         # sw.Shader.force_draw()
 
         # sw.Shader.use("panini")
         # sw.Shader.use_frame(None, False, (0, .5, 0, 1))
         # panini_fbo.use()
 
-        sw.entity.Draw.draw_image(outro, None, self.pos + Vec3(0, 0, -100), Vec3(100, 100, 100), self.angle, perspective=self.perspective)
+        sw.entity.Draw.draw_image(
+            outro,
+            None,
+            Vec3(0, 0, -100),
+            Vec3(10, 10, 10),
+            self.angle,
+            perspective=self.perspective,
+        )
+
+        sw.entity.Draw.draw_image(
+            lixeira,
+            None,
+            Vec3(0, 0, 0),
+            Vec3(1, 1, 1),
+            self.angle,
+            perspective=self.perspective,
+        )
+
 
 test()
 # # sw.Scene.create(test)

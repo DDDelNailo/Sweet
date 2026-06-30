@@ -18,6 +18,7 @@ src/sweet/build/__sh__.fsh
 src/sweet/build/__sh__.vsh
 src/sweet/graphics/UI.py
 src/sweet/graphics/__init__.py
+src/sweet/graphics/model.py
 src/sweet/graphics/shaders.py
 src/sweet/graphics/texture.py
 src/sweet/linalg/__init__.py
