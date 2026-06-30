@@ -1,14 +1,15 @@
 {
-    "textures": {
-        "player": "resources\\player_body.png",
-        "wall": "resources\\churchwall.png",
-        "pillar": "resources\\frontlane.png",
-        "front_pillar": "resources\\frontline.png",
-        "floor": "resources\\floor.png",
-        "plane": "resources\\Airplane Texture.png",
-        "pixel": "resources\\build\\pixel.png"
-    },
-    "models": {
-        "aviao": "resources\\Airplane.obj"
-    }
+  "textures": {
+    "player": "resources\\player_body.png",
+    "wall": "resources\\churchwall.png",
+    "pillar": "resources\\frontlane.png",
+    "front_pillar": "resources\\frontline.png",
+    "floor": "resources\\floor.png",
+    "plane": "resources\\Airplane Texture.png",
+    "pixel": "resources\\build\\pixel.png"
+  },
+  "models": {
+    "aviao": "resources\\Airplane.obj",
+    "lixeira": "resources/lixo_transparente.obj"
+  }
 }
